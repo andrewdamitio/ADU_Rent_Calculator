@@ -1,5 +1,11 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 
+const storage = storage ?? {
+  get: (k) => Promise.resolve({ value: localStorage.getItem(k) }),
+  set: (k, v) => Promise.resolve(localStorage.setItem(k, v)),
+  delete: (k) => Promise.resolve(localStorage.removeItem(k)),
+};
+
 const M=[{metro:"LA Westside",br:3500},{metro:"SF Peninsula",br:3250},{metro:"San Mateo Co.",br:3100},{metro:"Seattle (prime)",br:2800},{metro:"San Jose",br:2750},{metro:"LA — SFV",br:2600},{metro:"San Diego",br:2300},{metro:"Seattle (avg)",br:2200},{metro:"Austin",br:2000},{metro:"U.S. average",br:1900},{metro:"Portland",br:1700},{metro:"Denver",br:1650},{metro:"Midwest / SE",br:1200}];
 const rs=s=>Math.pow(s/600,0.55),ut=s=>s<450?"Studio":s<700?"1 Bed":s<950?"1–2 Bed":"2 Bed";
 const cMP=(p,r,y)=>{if(p<=0)return 0;const mr=r/12,n=y*12;if(mr===0)return p/n;return p*(mr*Math.pow(1+mr,n))/(Math.pow(1+mr,n)-1)};
@@ -158,7 +164,7 @@ const SRC=[
 const LT={bg:"#f8fafc",card:"#ffffff",border:"#e2e8f0",borderLight:"#f1f5f9",text:"#0f172a",body:"#475569",muted:"#64748b",mutedLight:"#94a3b8",pos:"#16a34a",posBg:"#dcfce7",info:"#2563eb",infoBg:"#dbeafe",warn:"#d97706",warnBg:"#fef3c7",neg:"#dc2626",negBg:"#fee2e2"};
 const ltCard={background:LT.card,border:"1px solid "+LT.border,borderRadius:12,boxShadow:"0 1px 3px rgba(15,23,42,0.04)"};
 
-function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,loanPmt,loanAmt,cashDownAmt,rate,term,growth,buildMonths,sqft,utype,rentalMode,strADR,isSTR,isHybrid,strMonths,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName}){
+function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,growth,buildMonths,sqft,utype,rentalMode,strADR,isSTR,isHybrid,strMonths,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName}){
   const[hovPt,setHovPt]=useState(null);
   const[barYear,setBarYear]=useState(1);
   const[hovPt2,setHovPt2]=useState(null);
@@ -179,25 +185,22 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
 
     {/* YOUR MARKET — editable inline */}
     <div style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+LT.info}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:10}}>
+      <div style={{marginBottom:10}}>
         <span style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>Your market</span>
-        {!hasCustom&&<span style={{fontSize:10,color:LT.warn,fontStyle:"italic"}}>Enter your local rent estimate to personalize this analysis</span>}
       </div>
       <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
         <div style={{flex:"1 1 220px",minWidth:200}}>
-          <div style={{fontSize:10,color:LT.muted,marginBottom:4,fontWeight:500}}>Location</div>
-          <input type="text" value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="e.g. Portland, OR or 12345 Main St" style={{width:"100%",background:LT.card,border:"1px solid "+LT.border,borderRadius:6,padding:"8px 12px",color:LT.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=LT.info} onBlur={e=>e.target.style.borderColor=LT.border}/>
+          <input type="text" value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="Location" style={{width:"100%",background:LT.card,border:"1px solid "+LT.border,borderRadius:6,padding:"8px 12px",color:LT.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=LT.info} onBlur={e=>e.target.style.borderColor=LT.border}/>
         </div>
         <div style={{flex:"1 1 200px",minWidth:180}}>
-          <div style={{fontSize:10,color:LT.muted,marginBottom:4,fontWeight:500}}>Expected rent for a comparable 1-bedroom in your area</div>
           <div style={{position:"relative"}}>
             <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:14,color:LT.muted,pointerEvents:"none"}}>$</span>
-            <input type="number" value={customRent||""} onChange={e=>setCustomRent(parseInt(e.target.value)||0)} placeholder="2500" style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"8px 12px 8px 24px",color:LT.text,fontSize:14,fontFamily:"'Fraunces',serif",fontWeight:600,outline:"none",boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=LT.info} onBlur={e=>e.target.style.borderColor=hasCustom?LT.border:LT.warn+"80"}/>
+            <input type="text" value={customRent||""} onChange={e=>setCustomRent(parseInt(e.target.value)||0)} placeholder="Rent estimate" style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"8px 12px 8px 24px",color:LT.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=LT.info} onBlur={e=>e.target.style.borderColor=hasCustom?LT.border:LT.warn+"80"}/>
             <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:12,color:LT.muted,pointerEvents:"none"}}>/mo</span>
           </div>
         </div>
       </div>
-      <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5,fontStyle:"italic"}}>Rents vary considerably even within the same city. Check Zillow, Apartments.com, or local listings for a 1-bedroom unit comparable to what you're building. Your input scales automatically based on the ADU size set in the Internal view.</div>
+      <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5,fontStyle:"italic"}}>Rents vary considerably even within the same city. Check Zillow, Apartments.com, or local listings for a {sqft} sq/ft unit comparable to what you're building. Your input scales automatically based on the ADU size set in the Internal view.</div>
     </div>
 
     {/* DOWN PAYMENT SLIDER — consumer-facing, syncs with internal */}
@@ -221,6 +224,27 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
       </div>
     </div>
 
+    {/* LOAN TERM SLIDER — consumer-facing, syncs with internal */}
+    <div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+        <span style={{fontSize:12,color:LT.body}}>How long is your loan?</span>
+        <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text}}>{term}-year loan</span>
+      </div>
+      <input type="range" min={5} max={20} step={1} value={term} onChange={e=>setTerm(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:0}}/>
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+        <span style={{fontSize:10,color:LT.muted}}>5 years</span>
+        <span style={{fontSize:10,color:LT.muted}}>20 years</span>
+      </div>
+      <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}} className="no-print">
+        {[{v:5,l:"5 yr"},{v:10,l:"10 yr"},{v:15,l:"15 yr"},{v:20,l:"20 yr"}].map(p=>(
+          <button key={p.v} onClick={()=>setTerm(p.v)} style={{padding:"5px 12px",borderRadius:6,fontSize:11,fontWeight:term===p.v?600:500,cursor:"pointer",userSelect:"none",border:"1px solid "+(term===p.v?LT.info:LT.border),background:term===p.v?LT.info:LT.card,color:term===p.v?LT.card:LT.body,transition:"all 0.15s",fontFamily:"inherit"}}>{p.l}</button>
+        ))}
+      </div>
+      <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5}}>
+        {term<=10?"Shorter loan = higher monthly payments but less interest paid overall. Monthly payment: "+fD(loanPmt)+".":"Longer loan = lower monthly payments ("+fD(loanPmt)+") but more interest paid over time."}
+      </div>
+    </div>
+
     {!hasCustom&&(
       <div style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
         <div style={{fontSize:36,marginBottom:12}}>↑</div>
@@ -231,14 +255,19 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
 
     {hasCustom&&(<>
     {/* HERO outcome card */}
-    <div style={{...ltCard,padding:"28px 30px",marginBottom:20,background:`linear-gradient(135deg, ${LT.card} 0%, ${pos?LT.posBg:LT.warnBg} 100%)`}}>
-      <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:10}}>10-year outcome in {featured.metro}</div>
-      <div style={{display:"flex",alignItems:"baseline",gap:16,flexWrap:"wrap",marginBottom:14}}>
-        <div style={{fontFamily:"'Fraunces',serif",fontSize:48,fontWeight:700,color:featured.ret>=0?LT.pos:LT.neg,lineHeight:1,letterSpacing:"-0.02em"}}>{featured.ret>=0?"+":""}{fK2(featured.ret)}</div>
-        <div style={{fontSize:15,color:LT.body}}><strong style={{color:LT.text}}>{featured.roi>=0?"+":""}{featured.roi.toFixed(1)}%/yr</strong> annualized total return</div>
+    <div style={{...ltCard,padding:"28px 30px",marginBottom:20}}>
+      <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:14}}>Estimated total return in {featured.metro}</div>
+      <div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        {[{yrs:10,ret:cm.ret10,roi:cm.roi10},{yrs:15,ret:cm.ret15,roi:cm.roi15},{yrs:20,ret:cm.ret20,roi:cm.roi20}].map(h=>(
+          <div key={h.yrs} style={{flex:"1 1 0",minWidth:90,textAlign:"center",padding:"16px 10px",borderRadius:10,background:h.ret>=0?LT.posBg:LT.warnBg,border:"1px solid "+(h.ret>=0?"rgba(34,197,94,0.2)":"rgba(251,191,36,0.2)")}}>
+            <div style={{fontSize:10,color:LT.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{h.yrs} years</div>
+            <div style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,color:h.ret>=0?LT.pos:LT.neg,lineHeight:1,marginBottom:4}}>{h.ret>=0?"+":""}{fK2(h.ret)}</div>
+            <div style={{fontSize:11,color:LT.body}}>{h.roi>=0?"+":""}{h.roi.toFixed(1)}%/yr</div>
+          </div>
+        ))}
       </div>
-      <div style={{fontSize:13,color:LT.body,lineHeight:1.6,maxWidth:560}}>
-        Over {term} years, your ADU returns approximately {fK2(featured.ret)} — the sum of net rental income{growth>0?" (with "+growth+"%/yr rent growth)":""} plus an estimated {fK2(featured.eq)} of added property value. The loan is paid off, and the unit continues generating rent indefinitely.
+      <div style={{fontSize:13,color:LT.body,lineHeight:1.6,textAlign:"center"}}>
+        Cumulative after-tax cash flow plus estimated ADU value{growth>0?", with "+growth+"%/yr rent growth":""}.{loanAmt>0?" Loan term: "+term+" years.":""}
       </div>
     </div>
 
@@ -260,7 +289,7 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
         const b=cm.yearlyBars[Math.min(barYear-1,cm.yearlyBars.length-1)];
         if(!b)return null;
         const totalExp=b.opEx+b.propTax+b.ins;
-        const maxBar=Math.max(...cm.yearlyBars.map(yb=>yb.rent),1);
+        const maxBar=Math.max(b.rent, b.pmt, totalExp, 1);
         const netMo=b.rent-totalExp-b.incomeTax-b.pmt;
         const netPos=netMo>=0;
         const taxActive=incomeTax>0;
@@ -272,9 +301,31 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
               <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:LT.pos}}>{fD(b.rent)}/mo</span>
             </div>
             <div style={{width:"100%",height:26,background:LT.borderLight,borderRadius:6,overflow:"hidden"}}>
-              <div style={{height:"100%",background:LT.pos,borderRadius:6,width:"100%",transition:"width 0.3s"}}/>
+              <div style={{height:"100%",background:LT.pos,borderRadius:6,width:`${(b.rent/maxBar)*100}%`,transition:"width 0.3s"}}/>
             </div>
           </div>
+          {loanAmt>0&&<div style={{opacity:b.pmt>0?1:0.35}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
+              <span style={{fontSize:12,color:b.pmt>0?LT.body:LT.muted}}>{b.pmt>0?"Loan payment ":"Loan payment (paid off)"}{b.pmt>0&&<span style={{fontSize:10,color:LT.muted}}>(interest vs. principal split)</span>}</span>
+              <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:b.pmt>0?LT.text:LT.pos}}>{b.pmt>0?"−"+fD(b.pmt)+"/mo":"$0 — paid off!"}</span>
+            </div>
+            {b.pmt>0?(<>
+              <div style={{width:"100%",height:26,background:LT.borderLight,borderRadius:6,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${(b.pmt/maxBar)*100}%`,display:"flex"}}>
+                  <div title={"Interest: "+fD(b.interest)+"/mo"} style={{height:"100%",background:LT.neg,width:`${(b.interest/b.pmt)*100}%`,transition:"width 0.3s",opacity:0.75}}/>
+                  <div title={"Principal: "+fD(b.principal)+"/mo"} style={{height:"100%",background:"#cbd5e1",width:`${(b.principal/b.pmt)*100}%`,transition:"width 0.3s"}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:14,marginTop:5,fontSize:10.5,color:LT.muted}}>
+                <span style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:10,background:LT.neg,opacity:0.75,borderRadius:2}}/>Interest <strong style={{color:LT.neg,fontFamily:"'Fraunces',serif"}}>{fD(b.interest)}</strong> <span style={{color:LT.mutedLight,fontStyle:"italic"}}>— cost of borrowing</span></span>
+                <span style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:10,background:"#cbd5e1",borderRadius:2}}/>Principal <strong style={{color:LT.text,fontFamily:"'Fraunces',serif"}}>{fD(b.principal)}</strong> <span style={{color:LT.mutedLight,fontStyle:"italic"}}>— builds equity</span></span>
+              </div>
+            </>):(
+              <div style={{width:"100%",height:26,background:LT.borderLight,borderRadius:6,overflow:"hidden"}}>
+                <div style={{height:"100%",background:LT.pos,borderRadius:6,width:"0%",transition:"width 0.3s"}}/>
+              </div>
+            )}
+          </div>}
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
               <span style={{fontSize:12,color:LT.body}}>Operating expenses <span style={{fontSize:10,color:LT.muted}}>(property tax, insurance, vacancy, maintenance)</span></span>
@@ -293,26 +344,6 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
               <div style={{height:"100%",background:taxActive?"#ef4444":"#cbd5e1",borderRadius:6,width:taxActive?`${(b.incomeTax/maxBar)*100}%`:"0%",transition:"width 0.3s",opacity:0.7}}/>
             </div>
           </div>
-          {loanAmt>0&&<div style={{opacity:b.pmt>0?1:0.35}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
-              <span style={{fontSize:12,color:b.pmt>0?LT.body:LT.muted}}>{b.pmt>0?"Loan payment ":"Loan payment (paid off)"}{b.pmt>0&&<span style={{fontSize:10,color:LT.muted}}>(interest vs. principal split)</span>}</span>
-              <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:b.pmt>0?LT.text:LT.pos}}>{b.pmt>0?"−"+fD(b.pmt)+"/mo":"$0 — paid off!"}</span>
-            </div>
-            {b.pmt>0?(<>
-              <div style={{width:"100%",height:26,background:LT.borderLight,borderRadius:6,overflow:"hidden",display:"flex"}}>
-                <div title={"Interest: "+fD(b.interest)+"/mo"} style={{height:"100%",background:LT.neg,width:`${(b.interest/b.pmt)*100}%`,transition:"width 0.3s",opacity:0.75}}/>
-                <div title={"Principal: "+fD(b.principal)+"/mo"} style={{height:"100%",background:"#cbd5e1",width:`${(b.principal/b.pmt)*100}%`,transition:"width 0.3s"}}/>
-              </div>
-              <div style={{display:"flex",gap:14,marginTop:5,fontSize:10.5,color:LT.muted}}>
-                <span style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:10,background:LT.neg,opacity:0.75,borderRadius:2}}/>Interest <strong style={{color:LT.neg,fontFamily:"'Fraunces',serif"}}>{fD(b.interest)}</strong> <span style={{color:LT.mutedLight,fontStyle:"italic"}}>— cost of borrowing</span></span>
-                <span style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:10,background:"#cbd5e1",borderRadius:2}}/>Principal <strong style={{color:LT.text,fontFamily:"'Fraunces',serif"}}>{fD(b.principal)}</strong> <span style={{color:LT.mutedLight,fontStyle:"italic"}}>— builds equity</span></span>
-              </div>
-            </>):(
-              <div style={{width:"100%",height:26,background:LT.borderLight,borderRadius:6,overflow:"hidden"}}>
-                <div style={{height:"100%",background:LT.pos,borderRadius:6,width:"0%",transition:"width 0.3s"}}/>
-              </div>
-            )}
-          </div>}
         </div>
         <div style={{marginTop:12,padding:"10px 14px",borderRadius:8,background:netPos?LT.posBg:LT.warnBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
@@ -640,8 +671,8 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
 
 export default function App(){
   const[state,setState]=useState(DEF);const[loaded,setLoaded]=useState(false);
-  useEffect(()=>{(async()=>{try{const r=await window.storage.get(SK);if(r?.value)setState(p=>({...p,...JSON.parse(r.value)}))}catch(e){}setLoaded(true)})()},[]);
-  useEffect(()=>{if(!loaded)return;(async()=>{try{await window.storage.set(SK,JSON.stringify(state))}catch(e){}})()},[state,loaded]);
+  useEffect(()=>{(async()=>{try{const r=await storage.get(SK);if(r?.value)setState(p=>({...p,...JSON.parse(r.value)}))}catch(e){}setLoaded(true)})()},[]);
+  useEffect(()=>{if(!loaded)return;(async()=>{try{await storage.set(SK,JSON.stringify(state))}catch(e){}})()},[state,loaded]);
   // Auto-feature the custom market whenever the user enters/updates custom info
   useEffect(()=>{if(state.customRent>0)setState(s=>({...s,featuredIdx:0}))},[state.customRent,state.customName]);
   const set=useCallback(k=>v=>setState(s=>({...s,[k]:v})),[]);
@@ -841,11 +872,30 @@ export default function App(){
       yearlyBars.push({year:yr,rent:rentY,opEx:opExY+vacY,propTax:ptY,ins:insY,incomeTax:taxY,pmt:pmtY,interest:interestY,principal:principalY,net:netY});
     }}
 
-        return{f,yearlyBars,yr10Rent,yr10Net,yr10Asset,cashCollected,margin,featuredStress,cfTimeline,yr1Value,valueRatio,instantEquity,postLoanMonthly,postLoanAnnual,totalPaid,totalSubsidies,totalRentCollected,equityGained};
+    // Fixed-horizon returns (10, 15, 20 years)
+    const retAtHorizon=(H)=>{
+      const entry=cfTimeline.find(p=>p.year===H);
+      if(entry)return entry.tot;
+      const last=cfTimeline[cfTimeline.length-1];
+      let cumExt=last.cum;
+      for(let y=last.year+1;y<=H;y++){
+        const mIdx=n2+(y-term)*12-1;
+        const rN=rNO0*Math.pow(1+mrG2,mIdx),pt=mPT0*Math.pow(1+mtG2,mIdx),ins=mIns0*Math.pow(1+miG2,mIdx);
+        const net2=rN-pt-ins,taxable=net2-dep2,tax2=tx>0&&taxable>0?taxable*tx:0;
+        cumExt+=(net2-tax2)*12;
+      }
+      return eqAtYr(H)+cumExt-cashDownAmt;
+    };
+    const ret10=retAtHorizon(10),ret15=retAtHorizon(15),ret20=retAtHorizon(20);
+    const roi10=total>0?(ret10/total)/10*100:0;
+    const roi15=total>0?(ret15/total)/15*100:0;
+    const roi20=total>0?(ret20/total)/20*100:0;
+
+        return{f,yearlyBars,yr10Rent,yr10Net,yr10Asset,cashCollected,margin,featuredStress,cfTimeline,yr1Value,valueRatio,instantEquity,postLoanMonthly,postLoanAnnual,totalPaid,totalSubsidies,totalRentCollected,equityGained,ret10,ret15,ret20,roi10,roi15,roi20};
   },[rows,featuredIdx,growth,term,sens,cashDownAmt,loanAmt,total,sqft,rentalMode,strADR,strCosts,strVacancy,strMonths,maint,vacancy,mgmt,assetCost,origFeeAmt,cashDown,taxRate,taxGrowth,insurance,insGrowth,rate,incomeTax,buildMonths,isSTR,isHybrid]);
 
   const headers=["Metro","Rent","Net","Cov.","+/−","CF+","Payback","Equity","Return"];
-  const handleReset=async()=>{setState(DEF);try{await window.storage.delete(SK)}catch(e){}};
+  const handleReset=async()=>{setState(DEF);try{await storage.delete(SK)}catch(e){}};
   if(!loaded)return(<div style={{fontFamily:"'DM Sans',sans-serif",background:"#0d1117",color:"#8b949e",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet"/>Loading…</div>);
 
   return(
@@ -861,7 +911,7 @@ export default function App(){
         </div>
 
       {view==="internal"&&(<>
-        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see which metros pencil.</p></div><button onClick={handleReset} style={{background:"transparent",border:"1px solid #30363d",borderRadius:6,color:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap",marginTop:4,flexShrink:0}} onMouseEnter={e=>{e.target.style.borderColor=tb;e.target.style.color=tb}} onMouseLeave={e=>{e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}>Reset all</button></div>
+        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see which metros pencil.</p></div><button onClick={handleReset} style={{background:"transparent",border:"1px solid #30363d",borderRadius:6,color:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap",marginTop:4,flexShrink:0}} onMouseEnter={e=>{e.target.style.borderColor=tb;e.target.style.color=tb}} onMouseLeave={e=>{e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}>Reset all</button></div>
 
         {/* COSTS */}
         <div style={{...card,padding:"18px 22px 14px",marginBottom:12}}>
@@ -1061,7 +1111,7 @@ export default function App(){
         </div>
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView featured={cm.f} cm={cm} sens={sens} rows={rows} featuredIdx={featuredIdx} setFeaturedIdx={set("featuredIdx")} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} rentalMode={rentalMode} strADR={strADR} isSTR={isSTR} isHybrid={isHybrid} strMonths={strMonths} hasCustom={customRent>0} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} />)}
+      {view==="consumer"&&cm&&(<ConsumerView featured={cm.f} cm={cm} sens={sens} rows={rows} featuredIdx={featuredIdx} setFeaturedIdx={set("featuredIdx")} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} rentalMode={rentalMode} strADR={strADR} isSTR={isSTR} isHybrid={isHybrid} strMonths={strMonths} hasCustom={customRent>0} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} />)}
 
       </div>
     </div>
