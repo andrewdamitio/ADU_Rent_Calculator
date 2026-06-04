@@ -10,7 +10,7 @@ const M=[{metro:"LA Westside",br:3500},{metro:"SF Peninsula",br:3250},{metro:"Sa
 const rs=s=>Math.pow(s/600,0.55),ut=s=>s<450?"Studio":s<700?"1 Bed":s<950?"1–2 Bed":"2 Bed";
 const cMP=(p,r,y)=>{if(p<=0)return 0;const mr=r/12,n=y*12;if(mr===0)return p/n;return p*(mr*Math.pow(1+mr,n))/(Math.pow(1+mr,n)-1)};
 function sim(p){
-  const{loanAmt,annRate,termYr,rentNetOpY1,mPTY1,mInsY1,rentGrowth,taxGrowthA,insGrowthA,taxMarg,depBasis,buildMo}=p;
+  const{loanAmt,annRate,termYr,rentNetOpY1,mPTY1,mInsY1,rentGrowth,taxGrowthA,insGrowthA,taxMarg,depBasis,buildMo,totalCost}=p;
   const bm=buildMo||0;
   const dep=(depBasis||loanAmt)/27.5/12;
   const mrG=rentGrowth>0?Math.pow(1+rentGrowth,1/12)-1:0;
@@ -28,7 +28,7 @@ function sim(p){
   const mr=annRate/12,pmt=cMP(loanAmt,annRate,termYr),n=termYr*12;
   const netY1=rentNetOpY1-mPTY1-mInsY1;
   if(netY1<=0)return{cfPlus:bm/12+termYr,cfAtTerm:true,po:Infinity,cum:-pmt*n};
-  let aBal=loanAmt,lBal=loanAmt,cum=0,cfm=-1,pom=-1;
+  let aBal=loanAmt,lBal=totalCost!=null?totalCost:loanAmt,cum=0,cfm=-1,pom=-1;
   for(let m=0;m<600;m++){
     const rNet=rentNetOpY1*Math.pow(1+mrG,m),pt=mPTY1*Math.pow(1+mtG,m),ins=mInsY1*Math.pow(1+miG,m);
     const net=rNet-pt-ins,inT=m<n;
@@ -50,7 +50,7 @@ const fK=n=>{const a=Math.abs(n),s=n<0?"-":"+";return a>=1000?s+"$"+Math.round(a
 
 const CI={"Metro":"City or metro area.\n\nBase rents are midpoints for a 1BR (600 sq ft) ADU, 2025–2026 market data.","Rent":"Year-1 monthly rent at the current ADU size.\n\nScaled from 1BR base: studios ≈ 75%, 2-beds ≈ 130%.\n\nIf STR mode is on, rent is computed from the nightly rate × 30.4 nights, scaled by metro vs. US average.","Net":"Year-1 rent minus operating expenses (pre-tax).\n\nProperty tax, insurance, maintenance, vacancy, management.","Cov.":"Year-1 pre-tax net rent ÷ loan payment.\n\nIgnores equity, rent growth, and income tax.\n100% = breakeven monthly.","+/−":"Year-1 pre-tax net rent minus loan payment.\n\nDoes NOT reflect rent growth or taxes.\n\nGreen = passive income.\nRed = monthly subsidy.","CF+":"Years until after-tax growing rent exceeds the fixed loan payment.\n\n'Now' = already positive in year 1.\n* = rent never caught up, but loan ended.\n\nAccounts for rent growth AND income tax (interest + depreciation deductions shrink over time).","Payback":"Years until cumulative after-tax net rent equals total project cost.\n\nSimple payback period — not loan payoff. Does not model extra principal payments; asks: how long until rent has returned the full investment?\n\nAccounts for rent growth and income tax.\n\nGreen ≤ term. Yellow ≤ 1.5×.\nRed = longer.","Equity":"Rough estimate of value added, using a GRM of 110× monthly rent.\n\nSimplified heuristic — real appraisers use sales comparables first, income approach as a cross-check. The right multiplier varies sharply: coastal CA and Seattle have GRMs of 200–300×, so this column likely understates value there. Midwest markets are closer to 80–120×.\n\nAlways uses LTR rent, not STR income.\n\nGreen = gross estimate exceeds ADU cost.","Return":"Total gain over loan term: cumulative after-tax cash flow + equity.\n\nAccounts for rent growth and income tax.\nThe % is annualized ROI."};
 
-const DEF={sqft:600,cpsf:250,permits:10000,hookup:8000,foundation:10000,sitePrep:8000,utilTrench:8000,electrical:3000,hardscape:2000,design:8000,surveys:3500,contingency:5,markup:20,rentalMode:"ltr",strADR:125,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,buildMonths:6,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal",featuredIdx:0};
+const DEF={sqft:600,cpsf:250,permits:10000,hookup:8000,foundation:10000,sitePrep:8000,utilTrench:8000,electrical:3000,hardscape:2000,design:8000,surveys:3500,contingency:5,markup:20,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,buildMonths:6,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal",featuredIdx:0};
 const SK="adu-calc-v16";
 const tk="#6e7681",tb="#58a6ff",gn="#3fb950",yl="#d29922",rd="#f85149";
 const card={background:"#161b22",border:"1px solid #21262d",borderRadius:10};
@@ -146,6 +146,8 @@ const SRC=[
 {t:"STR vs LTR for ADUs — Autonomous",u:"https://www.autonomous.ai/ourblog/adu-short-term-rental",n:"Comparative net-income analysis between strategies — informs the hybrid mode blending logic."},
 {t:"Furnished Finder — Medium-Term Rental Platform",u:"https://www.furnishedfinder.com/",n:"Traveling-nurse and 30+ day rentals — reference for the medium-term alternative to STR/LTR."},
 {t:"AirDNA Market Reports — Short-Term Rental Analytics",u:"https://www.airdna.co/",n:"Per-market STR occupancy, ADR, and revenue trends. Referenced for the warning that STR supply has grown faster than demand in many markets since 2022."},
+{t:"AirDNA 2026 US Short-Term Rental Outlook Report",u:"https://www.airdna.co/outlook-report",n:"Forward ADR growth forecast: 1.5% base case (conservative), 2–3% mid-range with mix shift toward premium listings, up to 4.5% in strong event markets. Source for the nightly rate growth slider tick marks."},
+{t:"AirDNA: 2026 Will Be the Best Year to Invest in STRs Since 2021 — PR Newswire",u:"https://www.prnewswire.com/news-releases/2026-will-be-the-best-year-to-invest-in-short-term-rentals-since-2021-new-airdna-report-finds-302643393.html",n:"Confirms post-pandemic ADR normalization (2022–2023 flat to 1%) and modest 2024–2025 recovery (2.1–3%). Basis for 'Flat' and 'Conservative' tick marks on the STR nightly rate growth slider."},
 {t:"Local STR Ordinance Tracker — Granicus / Host Compliance",u:"https://hostcompliance.com/blog/",n:"Catalog of city-level STR restrictions (LA, NYC, SF, Boston, etc.). Informs the STR regulatory-risk caveat."},
 ]},
 {cat:"Construction Timelines",links:[
@@ -184,10 +186,12 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
     </div>
 
     {/* YOUR MARKET — editable inline */}
-    <div style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+LT.info}}>
-      <div style={{marginBottom:10}}>
+    <div style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+(isSTR?"#94a3b8":LT.info),opacity:isSTR?0.5:1,pointerEvents:isSTR?"none":"auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <span style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>Your market</span>
+        {isSTR&&<span style={{fontSize:11,color:LT.warn,fontStyle:"italic"}}>Not applicable in STR mode — rent is driven by your nightly rate</span>}
       </div>
+      {!isSTR&&(<>
       <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
         <div style={{flex:"1 1 220px",minWidth:200}}>
           <input type="text" value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="Location" style={{width:"100%",background:LT.card,border:"1px solid "+LT.border,borderRadius:6,padding:"8px 12px",color:LT.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=LT.info} onBlur={e=>e.target.style.borderColor=LT.border}/>
@@ -201,6 +205,7 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
         </div>
       </div>
       <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5,fontStyle:"italic"}}>Rents vary considerably even within the same city. Check Zillow, Apartments.com, or local listings for a {sqft} sq/ft unit comparable to what you're building. Your input scales automatically based on the ADU size set in the Internal view.</div>
+      </>)}
     </div>
 
     {/* DOWN PAYMENT SLIDER — consumer-facing, syncs with internal */}
@@ -297,7 +302,7 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
-              <span style={{fontSize:12,color:LT.body}}>Expected rent</span>
+              <span style={{fontSize:12,color:LT.body}}>{isSTR?"Expected revenue":"Expected rent"}</span>
               <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:LT.pos}}>{fD(b.rent)}/mo</span>
             </div>
             <div style={{width:"100%",height:26,background:LT.borderLight,borderRadius:6,overflow:"hidden"}}>
@@ -670,19 +675,21 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
 }
 
 export default function App(){
-  const[state,setState]=useState(DEF);const[loaded,setLoaded]=useState(false);
+  const[state,setState]=useState(DEF);const[loaded,setLoaded]=useState(false);const[showSources,setShowSources]=useState(false);
   useEffect(()=>{(async()=>{try{const r=await storage.get(SK);if(r?.value)setState(p=>({...p,...JSON.parse(r.value)}))}catch(e){}setLoaded(true)})()},[]);
   useEffect(()=>{if(!loaded)return;(async()=>{try{await storage.set(SK,JSON.stringify(state))}catch(e){}})()},[state,loaded]);
   // Auto-feature the custom market whenever the user enters/updates custom info
   useEffect(()=>{if(state.customRent>0)setState(s=>({...s,featuredIdx:0}))},[state.customRent,state.customName]);
   const set=useCallback(k=>v=>setState(s=>({...s,[k]:v})),[]);
-  const{sqft,cpsf,permits,hookup,foundation,sitePrep,utilTrench,electrical,hardscape,design,surveys,contingency,markup,rentalMode,strADR,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,customRent,customName,view,featuredIdx}=state;
+  const{sqft,cpsf,permits,hookup,foundation,sitePrep,utilTrench,electrical,hardscape,design,surveys,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,customRent,customName,view,featuredIdx}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const hasSTR=isSTR||isHybrid;
   const buildCost=sqft*cpsf,siteCost=foundation+sitePrep+utilTrench+electrical+hardscape;
   const contingencyAmt=Math.round((buildCost+siteCost)*(contingency/100));
-  const softCost=permits+hookup+design+surveys+furnishing+contingencyAmt;
-  const subtotal=buildCost+siteCost+softCost,markupAmt=Math.round(subtotal*(markup/100));
+  const softCostBase=permits+hookup+design+surveys+furnishing;
+  const softCost=softCostBase+contingencyAmt;
+  const markupBase=buildCost+siteCost+softCostBase;
+  const subtotal=buildCost+siteCost+softCost,markupAmt=Math.round(markupBase*(markup/100));
   const assetCost=subtotal+markupAmt;
   const origFeeAmt=origFeeOn?Math.round(assetCost*(origFee/100)):0;
   const total=assetCost+origFeeAmt;
@@ -699,7 +706,7 @@ export default function App(){
   const refExpPct=refRent>0?Math.round((refExp/refRent)*100):0;
 
   const allMetros=customRent>0?[{metro:customName||"Custom",br:customRent},...M]:M;
-  const rows=useMemo(()=>{const pmt=cMP(loanAmt,rate/100,term),mPT=(assetCost*(taxRate/100))/12,mIns=(assetCost*(insurance/100))/12,s=rs(sqft),g=growth/100,tx=incomeTax/100,bm=buildMonths,tg=taxGrowth/100,ig=insGrowth/100;const sm=isSTR?(strADR*30.4/1900):isHybrid?((strMonths*(strADR*30.4/1900)+(12-strMonths))/12):1;const sc=isSTR?strCosts:isHybrid?strCosts*(strMonths/12):0;const sv=isSTR?strVacancy:isHybrid?strVacancy*(strMonths/12):0;const mg=isSTR?0:isHybrid?mgmt*((12-strMonths)/12):mgmt;const vc=isSTR?0:isHybrid?vacancy*((12-strMonths)/12):vacancy;return allMetros.map(m=>{const rent=Math.round(m.br*s*sm),ltrRent=Math.round(m.br*s),collected=rent*(1-(vc+sv)/100),opPct=(maint+mg+sc)/100,rentNetOp=collected*(1-opPct),net=rentNetOp-mPT-mIns,sur=net-pmt,pen=sur>=0,cov=pmt>0?((net/pmt)*100).toFixed(0):(net>0?"∞":"0");const{cfPlus,cfAtTerm,po,cum}=sim({loanAmt,annRate:rate/100,termYr:term,rentNetOpY1:rentNetOp,mPTY1:mPT,mInsY1:mIns,rentGrowth:g,taxGrowthA:tg,insGrowthA:ig,taxMarg:tx,depBasis:assetCost,buildMo:bm});const eq=ltrRent*110,ret=cum-cashDownAmt+eq,roi=total>0?((ret/total)/term*100):0;return{...m,rent,ltrRent,net,sur,pen,cov,po,cfPlus,cfAtTerm,eq,ret,roi,retOk:ret>0}})},[rate,term,total,assetCost,loanAmt,cashDownAmt,sqft,rentalMode,strADR,strCosts,strVacancy,strMonths,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,buildMonths,customRent,customName]);
+  const rows=useMemo(()=>{const pmt=cMP(loanAmt,rate/100,term),mPT=(assetCost*(taxRate/100))/12,mIns=(assetCost*(insurance/100))/12,s=rs(sqft),g=growth/100,sg=strGrowth/100,effG=isSTR?sg:isHybrid?(strMonths*sg+(12-strMonths)*g)/12:g,tx=incomeTax/100,bm=buildMonths,tg=taxGrowth/100,ig=insGrowth/100;const sm=isSTR?(strADR*30.4/1900):isHybrid?((strMonths*(strADR*30.4/1900)+(12-strMonths))/12):1;const sc=isSTR?strCosts:isHybrid?strCosts*(strMonths/12):0;const sv=isSTR?strVacancy:isHybrid?strVacancy*(strMonths/12):0;const mg=isSTR?0:isHybrid?mgmt*((12-strMonths)/12):mgmt;const vc=isSTR?0:isHybrid?vacancy*((12-strMonths)/12):vacancy;return allMetros.map(m=>{const rent=Math.round(m.br*s*sm),ltrRent=Math.round(m.br*s),collected=rent*(1-(vc+sv)/100),opPct=(maint+mg+sc)/100,rentNetOp=collected*(1-opPct),net=rentNetOp-mPT-mIns,sur=net-pmt,pen=sur>=0,cov=pmt>0?((net/pmt)*100).toFixed(0):(net>0?"∞":"0");const{cfPlus,cfAtTerm,po,cum}=sim({loanAmt,annRate:rate/100,termYr:term,rentNetOpY1:rentNetOp,mPTY1:mPT,mInsY1:mIns,rentGrowth:effG,taxGrowthA:tg,insGrowthA:ig,taxMarg:tx,depBasis:assetCost,buildMo:bm,totalCost:total});const eq=ltrRent*110,ret=cum-cashDownAmt+eq,roi=total>0?((ret/total)/term*100):0;return{...m,rent,ltrRent,net,sur,pen,cov,po,cfPlus,cfAtTerm,eq,ret,roi,retOk:ret>0}})},[rate,term,total,assetCost,loanAmt,cashDownAmt,sqft,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,buildMonths,customRent,customName]);
   const cfP=rows.filter(r=>r.pen).length,totP=rows.filter(r=>r.retOk).length;
 
   // Sensitivity analysis
@@ -757,9 +764,9 @@ export default function App(){
   const cm=useMemo(()=>{
     const f=rows[Math.min(featuredIdx,Math.max(0,rows.length-1))];
     if(!f)return null;
-    const g=growth/100;
-    const yr10Rent=f.rent*Math.pow(1+g,term);
-    const yr10Net=f.net*Math.pow(1+g,term);
+    const g=growth/100,sg=strGrowth/100,effG=isSTR?sg:isHybrid?(strMonths*sg+(12-strMonths)*g)/12:g;
+    const yr10Rent=f.rent*Math.pow(1+effG,term);
+    const yr10Net=f.net*Math.pow(1+effG,term);
     const yr10Asset=Math.round(f.ltrRent*Math.pow(1+g,term)*110);
     const cashCollected=f.ret-f.eq+cashDownAmt;
     const margin=sens.margins[Math.min(featuredIdx,Math.max(0,sens.margins.length-1))];
@@ -788,19 +795,19 @@ export default function App(){
       const rent2=f.br*s2*sm*sc2.rentMult;
       const collected2=rent2*(1-vacPct);
       const rentNetOp2=collected2*(1-opPct);
-      const{cfPlus,cfAtTerm,po}=sim({loanAmt:loanAmt2,annRate:rate/100,termYr:term,rentNetOpY1:rentNetOp2,mPTY1:mPT2,mInsY1:mIns2,rentGrowth:g,taxGrowthA:tg,insGrowthA:ig,taxMarg:tx,depBasis:aCost2,buildMo:buildMonths});
+      const{cfPlus,cfAtTerm,po}=sim({loanAmt:loanAmt2,annRate:rate/100,termYr:term,rentNetOpY1:rentNetOp2,mPTY1:mPT2,mInsY1:mIns2,rentGrowth:effG,taxGrowthA:tg,insGrowthA:ig,taxMarg:tx,depBasis:aCost2,buildMo:buildMonths,totalCost:total2});
       return{...sc2,cfPlus,cfAtTerm,po};
     });
 
     // Cash flow timeline — yearly cumulative after-tax CF for chart
     const ltrBase=f.ltrRent;
-    const eqAtYr=yr=>Math.round(ltrBase*Math.pow(1+g,yr)*110);
+    const eqAtYr=yr=>Math.round(ltrBase*Math.pow(1+g,yr)*110); // property value grows with LTR rate
     const cfTimeline=[{year:0,cum:0,eq:eqAtYr(0),loan:loanAmt,tot:eqAtYr(0)-loanAmt-cashDownAmt}];
     const mr2=rate/100/12,pmt2=cMP(loanAmt,rate/100,term),n2=term*12;
     const dep2=assetCost/27.5/12;
     const mPT0=(assetCost*(taxRate/100))/12,mIns0=(assetCost*(insurance/100))/12;
     const rent0=f.br*s2*sm,coll0=rent0*(1-vacPct),rNO0=coll0*(1-opPct);
-    const mrG2=g>0?Math.pow(1+g,1/12)-1:0,mtG2=tg>0?Math.pow(1+tg,1/12)-1:0,miG2=ig>0?Math.pow(1+ig,1/12)-1:0;
+    const mrG2=effG>0?Math.pow(1+effG,1/12)-1:0,mtG2=tg>0?Math.pow(1+tg,1/12)-1:0,miG2=ig>0?Math.pow(1+ig,1/12)-1:0;
     {let aB=loanAmt,cum2=0,totalSub=0;
     for(let m=0;m<n2;m++){
       const rN=rNO0*Math.pow(1+mrG2,m),pt=mPT0*Math.pow(1+mtG2,m),ins=mIns0*Math.pow(1+miG2,m);
@@ -849,7 +856,7 @@ export default function App(){
     for(let yr=1;yr<=term+3;yr++){
       const m0=(yr-1)*12;
       // Use mid-year (month 6) as representative
-      const midM=m0+6;
+      const midM=m0;
       const rentY=Math.round(rent0*Math.pow(1+mrG2,midM));
       const collY=rentY*(1-vacPct);
       const opExY=Math.round(collY*opPct);
@@ -894,7 +901,7 @@ export default function App(){
     const roi20=total>0?(ret20/total)/20*100:0;
 
         return{f,yearlyBars,yr10Rent,yr10Net,yr10Asset,cashCollected,margin,featuredStress,cfTimeline,yr1Value,valueRatio,instantEquity,postLoanMonthly,postLoanAnnual,totalPaid,totalSubsidies,totalRentCollected,equityGained,ret10,ret15,ret20,roi10,roi15,roi20};
-  },[rows,featuredIdx,growth,term,sens,cashDownAmt,loanAmt,total,sqft,rentalMode,strADR,strCosts,strVacancy,strMonths,maint,vacancy,mgmt,assetCost,origFeeAmt,cashDown,taxRate,taxGrowth,insurance,insGrowth,rate,incomeTax,buildMonths,isSTR,isHybrid]);
+  },[rows,featuredIdx,growth,strGrowth,term,sens,cashDownAmt,loanAmt,total,sqft,rentalMode,strADR,strCosts,strVacancy,strMonths,maint,vacancy,mgmt,assetCost,origFeeAmt,cashDown,taxRate,taxGrowth,insurance,insGrowth,rate,incomeTax,buildMonths,isSTR,isHybrid]);
 
   const headers=["Metro","Rent","Net","Cov.","+/−","CF+","Payback","Equity","Return"];
   const handleReset=async()=>{setState(DEF);try{await storage.delete(SK)}catch(e){}};
@@ -968,6 +975,8 @@ export default function App(){
               {isHybrid&&<TS label="Peak STR months per year" value={strMonths} onChange={set("strMonths")} min={1} max={6} step={1} format={v=>v+" mo STR / "+(12-v)+" mo LTR"} ticks={[{value:2,label:"Ski / holiday",color:tk},{value:3,label:"Short summer",color:tb},{value:4,label:"Full summer",color:gn},{value:6,label:"Half year",color:yl}]}/>}
               <TS label={"Average nightly rate"+(isHybrid?" (peak)":"")} value={strADR} onChange={set("strADR")} min={50} max={400} step={5} format={v=>"$"+v+"/night"} ticks={[{value:Math.round(75*scale),label:"Budget",color:tk},{value:Math.round(125*scale),label:utype+" avg",color:tb},{value:Math.round(200*scale),label:"Strong metro",color:gn},{value:Math.round(300*scale),label:"Prime / resort",color:yl}]}/>
               {isHybrid&&<div style={{fontSize:10,color:tb,lineHeight:1.4,fontStyle:"italic"}}>Peak months: ${strADR}/night = ~{fD(Math.round(strADR*30.4))}/mo gross (before vacancy). Off-peak months use LTR rent. Blended {strMonths}mo STR + {12-strMonths}mo LTR = effective {strMult.toFixed(2)}× LTR year-round.</div>}
+              <TS label={"Nightly rate growth"+(isHybrid?" (STR months)":"")} value={strGrowth} onChange={set("strGrowth")} min={0} max={6} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:rd},{value:1.5,label:"Conservative",color:tk},{value:2.5,label:"Base case",color:tb},{value:3.5,label:"Strong",color:gn},{value:5,label:"Exceptional",color:yl}]}/>
+              <div style={{fontSize:10,color:"#6e7681",lineHeight:1.4,marginTop:1,marginBottom:2,fontStyle:"italic"}}>Annual growth in the STR average daily rate. Post-pandemic normalization has settled ADR growth at 1.5–2.5%/yr for most markets; above 3.5% is strong. {isHybrid?"LTR months use the separate rent growth slider under Income & Tax Assumptions.":""} Property value is always projected using LTR rent growth.</div>
               <TS label="Hosting, cleaning & management" value={strCosts} onChange={set("strCosts")} min={3} max={40} step={1} format={v=>v+"% of STR gross"} ticks={[{value:3,label:"Airbnb 3%",color:gn},{value:5,label:"VRBO 5%",color:tk},{value:15,label:"+cleaning",color:tb},{value:22,label:"+co-host",color:tk},{value:30,label:"Full-svc mgr",color:yl}]}/>
               <div style={{fontSize:10,color:"#6e7681",lineHeight:1.4,marginTop:1,marginBottom:2,fontStyle:"italic"}}>Platform fees + cleaning + management for STR {isHybrid?"months only. LTR months use the management rate in Operating Expenses below.":"year-round. Replaces property management in Operating Expenses."}</div>
               <TS label="Unbooked nights / vacancy" value={strVacancy} onChange={set("strVacancy")} min={5} max={40} step={1} format={v=>v+"% of nights"} ticks={[{value:8,label:"Hot market",color:gn},{value:15,label:"Typical",color:tb},{value:25,label:"Seasonal",color:yl},{value:35,label:"Soft / new",color:rd}]}/>
@@ -1037,9 +1046,10 @@ export default function App(){
         </div>
 
         {/* CUSTOM LOCATION */}
-        <div style={{...card,padding:"14px 18px",marginBottom:12}}>
+        <div style={{...card,padding:"14px 18px",marginBottom:12,opacity:isSTR?0.45:1,pointerEvents:isSTR?"none":"auto"}}>
           <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
             <span style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:500,flexShrink:0}}>Custom location</span>
+            {isSTR?(<span style={{fontSize:10,color:yl,fontStyle:"italic"}}>Not used in STR mode — rent is set by nightly rate above</span>):(<>
             <input type="text" value={customName} onChange={e=>set("customName")(e.target.value)} placeholder="Location name" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"5px 10px",color:"#e6edf3",fontSize:13,fontFamily:"'DM Sans',sans-serif",width:160,outline:"none"}} onFocus={e=>e.target.style.borderColor=tb} onBlur={e=>e.target.style.borderColor="#30363d"}/>
             <div style={{display:"flex",alignItems:"center",gap:4}}>
               <span style={{fontSize:12,color:"#8b949e"}}>$</span>
@@ -1048,10 +1058,11 @@ export default function App(){
             </div>
             <button onClick={()=>set("view")("consumer")} style={{padding:"5px 14px",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",border:"1px solid "+tb,background:"rgba(88,166,255,0.12)",color:tb,fontFamily:"inherit",transition:"all 0.15s",flexShrink:0}} onMouseEnter={e=>{e.currentTarget.style.background="rgba(88,166,255,0.25)"}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(88,166,255,0.12)"}}>Go →</button>
             <span style={{fontSize:10,color:"#6e7681",fontStyle:"italic"}}>Size scaling and STR premium apply automatically</span>
+            </>)}
           </div>
         </div>
 
-        {customRent>500?(<>
+        {(customRent>500||isSTR)?(<>
         {/* TABLE */}
         <div style={{marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"baseline",flexWrap:"wrap",gap:6}}>
           <span style={{fontSize:11,color:"#8b949e"}}>{sqft} sq ft {utype.toLowerCase()}, {isSTR?<span style={{color:yl}}>${strADR}/night STR</span>:isHybrid?<span style={{color:tb}}>{strMonths}mo @ ${strADR}/night + {12-strMonths}mo LTR</span>:"long-term lease"}{growth>0&&<span style={{color:tb}}> · +{growth}%/yr</span>}{incomeTax>0&&<span style={{color:yl}}> · {incomeTax}% tax</span>}{buildMonths>0&&<span style={{color:yl}}> · {buildMonths}mo build</span>}</span>
@@ -1095,24 +1106,29 @@ export default function App(){
         </div>
 
         {/* SOURCES */}
-        <div style={{marginTop:24,padding:"18px 22px",...card}}>
-          <div style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:500,marginBottom:6}}>Sources & data provenance</div>
-          <div style={{fontSize:11,color:"#8b949e",lineHeight:1.6,marginBottom:16,maxWidth:760}}>Each source below is annotated with what it contributed to the model. Defaults and tick marks reflect cross-referenced 2025–2026 data, primarily from Terner Center academic research, IRS publications, builder cost reporting, and aggregated insurance-rate data. Where sources conflict, the model uses the median or the more conservative value.</div>
-          <div style={{display:"flex",flexDirection:"column",gap:18}}>
-            {SRC.map(s=>(
-              <div key={s.cat}>
-                <div style={{fontSize:12,fontWeight:600,color:"#e6edf3",marginBottom:8,paddingBottom:4,borderBottom:"1px solid #21262d"}}>{s.cat}</div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {s.links.map((l,i)=>(
-                    <div key={i} style={{paddingLeft:8,borderLeft:"2px solid #21262d"}}>
-                      <a href={l.u} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:tb,textDecoration:"none",lineHeight:1.5,fontWeight:500,display:"inline-block"}} onMouseEnter={e=>e.target.style.textDecoration="underline"} onMouseLeave={e=>e.target.style.textDecoration="none"}>{l.t} ↗</a>
-                      {l.n&&<div style={{fontSize:10.5,color:"#8b949e",lineHeight:1.6,marginTop:3,fontStyle:"italic"}}>{l.n}</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+        <div style={{marginTop:24,...card}}>
+          <div onClick={()=>setShowSources(s=>!s)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 22px",cursor:"pointer",userSelect:"none"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.03)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <span style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:500}}>Sources & data provenance</span>
+            <span style={{fontSize:13,color:"#8b949e"}}>{showSources?"▴":"▾"}</span>
           </div>
+          {showSources&&(<div style={{padding:"0 22px 18px"}}>
+            <div style={{fontSize:11,color:"#8b949e",lineHeight:1.6,marginBottom:16,maxWidth:760}}>Each source below is annotated with what it contributed to the model. Defaults and tick marks reflect cross-referenced 2025–2026 data, primarily from Terner Center academic research, IRS publications, builder cost reporting, and aggregated insurance-rate data. Where sources conflict, the model uses the median or the more conservative value.</div>
+            <div style={{display:"flex",flexDirection:"column",gap:18}}>
+              {SRC.map(s=>(
+                <div key={s.cat}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#e6edf3",marginBottom:8,paddingBottom:4,borderBottom:"1px solid #21262d"}}>{s.cat}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {s.links.map((l,i)=>(
+                      <div key={i} style={{paddingLeft:8,borderLeft:"2px solid #21262d"}}>
+                        <a href={l.u} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:tb,textDecoration:"none",lineHeight:1.5,fontWeight:500,display:"inline-block"}} onMouseEnter={e=>e.target.style.textDecoration="underline"} onMouseLeave={e=>e.target.style.textDecoration="none"}>{l.t} ↗</a>
+                        {l.n&&<div style={{fontSize:10.5,color:"#8b949e",lineHeight:1.6,marginTop:3,fontStyle:"italic"}}>{l.n}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>)}
         </div>
         </>):(<div style={{...card,marginTop:8,padding:"32px 24px",textAlign:"center"}}><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.6}}>Enter an estimated local rent <strong style={{color:"#e6edf3"}}>above $500</strong> in the Custom location field above to see the full market analysis.</p></div>)}
       </>)}
