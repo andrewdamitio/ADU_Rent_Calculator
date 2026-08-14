@@ -218,7 +218,11 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
           <label htmlFor="cRent" style={{display:"block",fontSize:10,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,marginBottom:5}}>Monthly rent</label>
           <div style={{position:"relative"}}>
             <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,color:LT.muted,pointerEvents:"none",fontFamily:"'Fraunces',serif"}}>$</span>
+<<<<<<< HEAD
             <input id="cRent" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>setCustomRent(parseInt(e.target.value)||0)} placeholder="e.g. 2000" style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"9px 44px 9px 26px",color:LT.text,fontSize:16,fontFamily:"'Fraunces',serif",outline:"none",boxSizing:"border-box"}}/>
+=======
+            <input id="cRent" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>setCustomRent(parseInt(e.target.value)||0)} placeholder="2,000" style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"9px 44px 9px 26px",color:LT.text,fontSize:16,fontFamily:"'Fraunces',serif",outline:"none",boxSizing:"border-box"}}/>
+>>>>>>> dac7ea3c18be84ffc6b5d67a2a1f7279c1abc15e
             <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:12,color:LT.muted,pointerEvents:"none"}}>/mo</span>
           </div>
         </div>
@@ -1092,7 +1096,11 @@ function App(){
               <label htmlFor="rentAmt" style={{fontSize:10,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Monthly rent</label>
               <div style={{display:"flex",alignItems:"center",gap:5}}>
                 <span style={{fontSize:14,color:"#8b949e",fontFamily:"'Fraunces',serif"}}>$</span>
+<<<<<<< HEAD
                 <input id="rentAmt" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>set("customRent")(parseInt(e.target.value)||0)} placeholder="e.g. 2000" style={{background:"#0d1117",border:"1px solid "+(hasCustom?"#30363d":yl+"80"),borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:15,fontFamily:"'Fraunces',serif",width:120,outline:"none"}}/>
+=======
+                <input id="rentAmt" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>set("customRent")(parseInt(e.target.value)||0)} placeholder="2,000" style={{background:"#0d1117",border:"1px solid "+(hasCustom?"#30363d":yl+"80"),borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:15,fontFamily:"'Fraunces',serif",width:120,outline:"none"}}/>
+>>>>>>> dac7ea3c18be84ffc6b5d67a2a1f7279c1abc15e
                 <span style={{fontSize:11,color:"#8b949e"}}>/mo</span>
               </div>
             </div>
