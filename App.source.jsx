@@ -227,7 +227,10 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
       <h1 style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,letterSpacing:"-0.02em",color:LT.text,margin:"0 0 6px"}}>Your ADU Investment Summary</h1>
       <p style={{fontSize:14,color:LT.body,margin:0,lineHeight:1.5}}>{sqft} sq ft {utype.toLowerCase()} · {fD(total)} project · {rate.toFixed(1)}% / {term}-year financing{cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""}</p>
       </div>
-      <button onClick={copyShare} className="no-print" style={{background:copied?LT.posBg:LT.info,border:"1px solid "+(copied?LT.pos:LT.info),borderRadius:8,color:copied?LT.pos:"#fff",fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"inherit"}}>{copied?"Model link copied ✓":"Copy model link"}</button>
+      <div className="no-print" style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap"}}>
+        <button onClick={()=>window.print()} style={{background:LT.card,border:"1px solid "+LT.border,borderRadius:8,color:LT.body,fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>Print / Save as PDF</button>
+        <button onClick={copyShare} style={{background:copied?LT.posBg:LT.info,border:"1px solid "+(copied?LT.pos:LT.info),borderRadius:8,color:copied?LT.pos:"#fff",fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>{copied?"Model link copied ✓":"Copy model link"}</button>
+      </div>
     </div>
 
     {/* RENT YOU'D CHARGE — same state as the Internal view */}
@@ -379,9 +382,9 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
                   <div title={"Principal: "+fD(b.principal)+"/mo"} style={{height:"100%",background:"#cbd5e1",width:`${(b.principal/b.pmt)*100}%`,transition:"width 0.3s"}}/>
                 </div>
               </div>
-              <div style={{display:"flex",gap:14,marginTop:5,fontSize:10.5,color:LT.muted}}>
-                <span style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:10,background:LT.neg,opacity:0.75,borderRadius:2}}/>Interest <strong style={{color:LT.neg,fontFamily:"'Fraunces',serif"}}>{fD(b.interest)}</strong> <span style={{color:LT.mutedLight}}>— cost of borrowing</span></span>
-                <span style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:10,background:"#cbd5e1",borderRadius:2}}/>Principal <strong style={{color:LT.text,fontFamily:"'Fraunces',serif"}}>{fD(b.principal)}</strong> <span style={{color:LT.mutedLight}}>— builds equity</span></span>
+              <div style={{display:"flex",gap:14,marginTop:5,fontSize:10.5,color:LT.muted,flexWrap:"wrap"}}>
+                <span style={{display:"inline-flex",alignItems:"center",gap:5,flexWrap:"wrap"}}><span style={{display:"inline-block",width:10,height:10,background:LT.neg,opacity:0.75,borderRadius:2,flexShrink:0}}/>Interest <strong style={{color:LT.neg,fontFamily:"'Fraunces',serif"}}>{fD(b.interest)}</strong> <span style={{color:LT.mutedLight}}>— cost of borrowing</span></span>
+                <span style={{display:"inline-flex",alignItems:"center",gap:5,flexWrap:"wrap"}}><span style={{display:"inline-block",width:10,height:10,background:"#cbd5e1",borderRadius:2,flexShrink:0}}/>Principal <strong style={{color:LT.text,fontFamily:"'Fraunces',serif"}}>{fD(b.principal)}</strong> <span style={{color:LT.mutedLight}}>— builds equity</span></span>
               </div>
             </>):(
               <div style={{width:"100%",height:26,background:LT.borderLight,borderRadius:6,overflow:"hidden"}}>
@@ -420,7 +423,7 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
     </div>
 
         {/* 4-column summary */}
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:20}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:20}}>
       <div style={{...ltCard,padding:"16px 16px"}}>
         <div style={{fontSize:9.5,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:8,lineHeight:1.3}}>Year-1 Cash Flow</div>
         <div style={{fontFamily:"'Fraunces',serif",fontSize:23,fontWeight:700,color:pos?LT.pos:LT.warn,lineHeight:1,marginBottom:6}}>{cf>=0?"+":""}{fD(cf)}<span style={{fontSize:11,color:LT.muted,fontWeight:400}}>/mo</span></div>
@@ -446,7 +449,7 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
     {/* PROPERTY VALUE — instant equity */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:14}}>Impact on your property value</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginBottom:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:16,marginBottom:16}}>
         <div style={{textAlign:"center",padding:"14px 10px",borderRadius:10,background:LT.borderLight}}>
           <div style={{fontSize:10,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:500,marginBottom:6}}>You invest</div>
           <div style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:LT.text}}>{fD(total)}</div>
@@ -644,7 +647,7 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
     {/* WHAT YOU KEEP */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:14}}>What you keep after {term} years</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:24}}>
         <div>
           <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:14}}>
             <div style={{fontSize:11,color:LT.muted,minWidth:14,marginTop:2}}>✓</div>
@@ -733,7 +736,8 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
 }
 
 function App(){
-  const[state,setState]=useState(DEF);const[loaded,setLoaded]=useState(false);const[showSources,setShowSources]=useState(false);const[copied,setCopied]=useState(false);
+  const[state,setState]=useState(DEF);const[loaded,setLoaded]=useState(false);const[showSources,setShowSources]=useState(false);const[copied,setCopied]=useState(false);const[confirmReset,setConfirmReset]=useState(false);
+  const resetTimerRef=useRef(null);
   useEffect(()=>{(async()=>{
     try{
       const shared=shareParamsFromLocation();
@@ -970,6 +974,16 @@ function App(){
 
   const headers=["Metro","Rent","Net","Cov.","+/−","CF+","Payback","Equity","Return"];
   const handleReset=async()=>{setState(DEF);try{await storage.delete(SK)}catch(e){}};
+  const onResetClick=()=>{
+    if(confirmReset){
+      if(resetTimerRef.current)clearTimeout(resetTimerRef.current);
+      setConfirmReset(false);
+      handleReset();
+    }else{
+      setConfirmReset(true);
+      resetTimerRef.current=setTimeout(()=>setConfirmReset(false),3000);
+    }
+  };
   const dark=view!=="consumer";
   if(!loaded)return(<div style={{fontFamily:"'DM Sans',sans-serif",background:"#0d1117",color:"#8b949e",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet"/>Loading…</div>);
 
@@ -990,7 +1004,7 @@ function App(){
         </div>
 
       {view==="internal"&&(<>
-        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><div style={{display:"flex",gap:8,flexShrink:0,marginTop:4}}><button onClick={copyShare} style={{background:copied?"rgba(63,185,80,0.15)":tb,border:"1px solid "+(copied?gn:tb),borderRadius:8,color:copied?gn:"#0d1117",fontSize:13,fontWeight:600,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap",transition:"background 0.15s"}} onMouseEnter={e=>{if(!copied)e.target.style.background="#79b8ff"}} onMouseLeave={e=>{if(!copied)e.target.style.background=tb}}>{copied?"Model link copied ✓":"Copy model link"}</button><button onClick={handleReset} style={{background:"transparent",border:"1px solid #30363d",borderRadius:6,color:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{e.target.style.borderColor=tb;e.target.style.color=tb}} onMouseLeave={e=>{e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}>Reset all</button></div></div>
+        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><div style={{display:"flex",gap:8,flexShrink:0,marginTop:4}}><button onClick={copyShare} style={{background:copied?"rgba(63,185,80,0.15)":tb,border:"1px solid "+(copied?gn:tb),borderRadius:8,color:copied?gn:"#0d1117",fontSize:13,fontWeight:600,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap",transition:"background 0.15s"}} onMouseEnter={e=>{if(!copied)e.target.style.background="#79b8ff"}} onMouseLeave={e=>{if(!copied)e.target.style.background=tb}}>{copied?"Model link copied ✓":"Copy model link"}</button><button onClick={onResetClick} style={{background:confirmReset?"rgba(248,81,73,0.15)":"transparent",border:"1px solid "+(confirmReset?rd:"#30363d"),borderRadius:6,color:confirmReset?rd:"#8b949e",fontWeight:confirmReset?600:400,fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{if(!confirmReset){e.target.style.borderColor=tb;e.target.style.color=tb}}} onMouseLeave={e=>{if(!confirmReset){e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}}>{confirmReset?"Click again to confirm":"Reset all"}</button></div></div>
 
         {/* COSTS */}
         <div style={{...card,padding:"18px 22px 14px",marginBottom:12}}>
