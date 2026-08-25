@@ -227,7 +227,7 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
       <h1 style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,letterSpacing:"-0.02em",color:LT.text,margin:"0 0 6px"}}>Your ADU Investment Summary</h1>
       <p style={{fontSize:14,color:LT.body,margin:0,lineHeight:1.5}}>{sqft} sq ft {utype.toLowerCase()} · {fD(total)} project · {rate.toFixed(1)}% / {term}-year financing{cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""}</p>
       </div>
-      <button onClick={copyShare} className="no-print" style={{background:copied?LT.posBg:LT.card,border:"1px solid "+(copied?LT.pos:LT.border),borderRadius:6,color:copied?LT.pos:LT.body,fontSize:12,fontWeight:500,padding:"7px 12px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"inherit",marginTop:4}}>{copied?"Link copied ✓":"Copy share link"}</button>
+      <button onClick={copyShare} className="no-print" style={{background:copied?LT.posBg:LT.info,border:"1px solid "+(copied?LT.pos:LT.info),borderRadius:8,color:copied?LT.pos:"#fff",fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"inherit"}}>{copied?"Model link copied ✓":"Copy model link"}</button>
     </div>
 
     {/* RENT YOU'D CHARGE — same state as the Internal view */}
@@ -276,6 +276,15 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
       <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5}}>
         {cashDown===0?"100% financed at "+rate.toFixed(1)+"%. Monthly payment: "+fD(loanPmt)+". No cash out of pocket.":cashDown===100?"No loan needed — you own the ADU outright from day one. All returns are pure cash flow.":fD(cashDownAmt)+" cash + "+fD(loanAmt)+" financed at "+rate.toFixed(1)+"%. Monthly payment: "+fD(loanPmt)+"."}
       </div>
+    </div>
+
+    {/* INTEREST RATE — read-only here; only adjustable in the Internal view */}
+    <div style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+      <div>
+        <div style={{fontSize:12,color:LT.body,marginBottom:2}}>Interest rate on your loan</div>
+        <div style={{fontSize:10.5,color:LT.muted}}>Fixed for this estimate — adjustable only in the Internal view.</div>
+      </div>
+      <span style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:LT.text}}>{rate.toFixed(1)}%</span>
     </div>
 
     {/* LOAN TERM SLIDER — consumer-facing, syncs with internal */}
@@ -419,8 +428,8 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
       </div>
       <div style={{...ltCard,padding:"16px 16px"}}>
         <div style={{fontSize:9.5,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:8,lineHeight:1.3}}>Years to Cash Positive</div>
-        <div style={{fontFamily:"'Fraunces',serif",fontSize:23,fontWeight:700,color:featured.cfAtTerm?LT.warn:LT.pos,lineHeight:1,marginBottom:6}}>{isCashPositive?"Day one":featured.cfAtTerm?term+"+":cfPlusYears.toFixed(1)+" yr"}</div>
-        <div style={{fontSize:11,color:LT.body,lineHeight:1.45}}>{isCashPositive?"Rent covers loan from month 1":featured.cfAtTerm?"Loan paid off at year "+term:"When growing rent overtakes loan payment"}</div>
+        <div style={{fontFamily:"'Fraunces',serif",fontSize:23,fontWeight:700,color:featured.cfAtTerm?LT.warn:LT.pos,lineHeight:1,marginBottom:6}}>{isCashPositive?"Day one":cfPlusYears.toFixed(1)+" yr"}</div>
+        <div style={{fontSize:11,color:LT.body,lineHeight:1.45}}>{isCashPositive?"Rent covers loan from month 1":featured.cfAtTerm?"Loan paid off around year "+cfPlusYears.toFixed(1):"When growing rent overtakes loan payment"}</div>
       </div>
       <div style={{...ltCard,padding:"16px 16px"}}>
         <div style={{fontSize:9.5,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:8,lineHeight:1.3}}>Payback Period</div>
@@ -694,7 +703,7 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
         <tbody>
           {cm.featuredStress.map((t,i)=>{const cfCol=t.cfPlus<=0?LT.pos:t.cfPlus<=3?LT.pos:t.cfPlus<=term?LT.warn:LT.neg;const poCol=t.po<=term?LT.pos:t.po<=term*1.5?LT.warn:LT.neg;const isBase=i===0;return(<tr key={i} style={{borderBottom:i<cm.featuredStress.length-1?"1px solid "+LT.borderLight:"none",background:isBase?LT.borderLight:"transparent"}}>
             <td style={{padding:"10px 4px",color:LT.text,fontWeight:isBase?600:500}}>{t.label}</td>
-            <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:cfCol}}>{t.cfPlus<=0?"Day one":t.cfAtTerm?term+"+ yr":t.cfPlus.toFixed(1)+" yr"}</td>
+            <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:cfCol}}>{t.cfPlus<=0?"Day one":t.cfPlus.toFixed(1)+" yr"}</td>
             <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:poCol}}>{t.po===Infinity?"Never":t.po>50?"50+ yr":t.po.toFixed(1)+" yr"}</td>
           </tr>)})}
         </tbody>
@@ -843,7 +852,9 @@ function App(){
       {label:"Construction 25% over budget",rentMult:1,costMult:1.25},
     ];
     const featuredStress=scenarios.map(sc2=>{
-      const aCost2=assetCost*sc2.costMult,total2=aCost2+origFeeAmt;
+      const aCost2=assetCost*sc2.costMult;
+      const origFeeAmt2=origFeeOn?Math.round(aCost2*(origFee/100)):0;
+      const total2=aCost2+origFeeAmt2;
       const cashDown2=Math.round(total2*(cashDown/100)),loanAmt2=total2-cashDown2;
       const mPT2=(aCost2*(taxRate/100))/12,mIns2=(aCost2*(insurance/100))/12;
       const rent2=f.br*s2*sm*sc2.rentMult;
@@ -955,7 +966,7 @@ function App(){
     const roi20=total>0?(ret20/total)/20*100:0;
 
         return{f,yearlyBars,yr10Rent,yr10Net,yr10Asset,cashCollected,margin,featuredStress,cfTimeline,yr1Value,valueRatio,instantEquity,postLoanMonthly,postLoanAnnual,totalPaid,totalSubsidies,totalRentCollected,equityGained,ret10,ret15,ret20,roi10,roi15,roi20};
-  },[rows,featuredIdx,growth,strGrowth,term,sens,cashDownAmt,loanAmt,total,sqft,rentalMode,strADR,strCosts,strVacancy,strMonths,maint,vacancy,mgmt,assetCost,origFeeAmt,cashDown,taxRate,taxGrowth,insurance,insGrowth,rate,incomeTax,buildMonths,isSTR,isHybrid]);
+  },[rows,featuredIdx,growth,strGrowth,term,sens,cashDownAmt,loanAmt,total,sqft,rentalMode,strADR,strCosts,strVacancy,strMonths,maint,vacancy,mgmt,assetCost,origFeeOn,origFee,cashDown,taxRate,taxGrowth,insurance,insGrowth,rate,incomeTax,buildMonths,isSTR,isHybrid]);
 
   const headers=["Metro","Rent","Net","Cov.","+/−","CF+","Payback","Equity","Return"];
   const handleReset=async()=>{setState(DEF);try{await storage.delete(SK)}catch(e){}};
@@ -979,7 +990,7 @@ function App(){
         </div>
 
       {view==="internal"&&(<>
-        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><div style={{display:"flex",gap:8,flexShrink:0,marginTop:4}}><button onClick={copyShare} style={{background:"transparent",border:"1px solid "+(copied?gn:"#30363d"),borderRadius:6,color:copied?gn:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{if(!copied){e.target.style.borderColor=tb;e.target.style.color=tb}}} onMouseLeave={e=>{if(!copied){e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}}>{copied?"Link copied ✓":"Copy share link"}</button><button onClick={handleReset} style={{background:"transparent",border:"1px solid #30363d",borderRadius:6,color:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{e.target.style.borderColor=tb;e.target.style.color=tb}} onMouseLeave={e=>{e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}>Reset all</button></div></div>
+        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><div style={{display:"flex",gap:8,flexShrink:0,marginTop:4}}><button onClick={copyShare} style={{background:copied?"rgba(63,185,80,0.15)":tb,border:"1px solid "+(copied?gn:tb),borderRadius:8,color:copied?gn:"#0d1117",fontSize:13,fontWeight:600,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap",transition:"background 0.15s"}} onMouseEnter={e=>{if(!copied)e.target.style.background="#79b8ff"}} onMouseLeave={e=>{if(!copied)e.target.style.background=tb}}>{copied?"Model link copied ✓":"Copy model link"}</button><button onClick={handleReset} style={{background:"transparent",border:"1px solid #30363d",borderRadius:6,color:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{e.target.style.borderColor=tb;e.target.style.color=tb}} onMouseLeave={e=>{e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}>Reset all</button></div></div>
 
         {/* COSTS */}
         <div style={{...card,padding:"18px 22px 14px",marginBottom:12}}>
