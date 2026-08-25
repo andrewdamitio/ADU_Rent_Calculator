@@ -1,4 +1,4 @@
-import React, { StrictMode, useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { StrictMode, useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 
 // localStorage-backed persistence, same promise-returning shape as before.
@@ -89,7 +89,7 @@ function shareParamsFromLocation(){
 const tk="#6e7681",tb="#58a6ff",gn="#3fb950",yl="#d29922",rd="#f85149";
 const card={background:"#161b22",border:"1px solid #21262d",borderRadius:10};
 
-function IT({text,align}){const[o,sO]=useState(false);const[pin,sP]=useState(false);const r=useRef(null);useEffect(()=>{if(!o)return;const h=e=>{if(r.current&&!r.current.contains(e.target)){sO(false);sP(false)}};document.addEventListener("mousedown",h);document.addEventListener("touchstart",h);return()=>{document.removeEventListener("mousedown",h);document.removeEventListener("touchstart",h)}},[o]);const ls=text.split("\n");const pos=align==="left"?{left:-4}:align==="right"?{right:-4}:{left:"50%",transform:"translateX(-50%)"};const arr=align==="left"?{left:12}:align==="right"?{right:12}:{left:"50%",marginLeft:-4};return(<span ref={r} style={{position:"relative",display:"inline-block",marginLeft:3,verticalAlign:"middle"}}><span role="button" tabIndex={0} aria-label="More information" onClick={e=>{e.stopPropagation();sP(v=>{const n=!v;sO(n);return n})}} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();sP(v=>{const n=!v;sO(n);return n})}if(e.key==="Escape"){sP(false);sO(false)}}} onMouseEnter={()=>sO(true)} onMouseLeave={()=>{if(!pin)sO(false)}} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:12,height:12,borderRadius:"50%",border:"1px solid "+(o?tb:"#3d444d"),color:o?tb:tk,fontSize:7.5,fontWeight:700,cursor:"pointer",transition:"all 0.15s",fontFamily:"'DM Sans',sans-serif",letterSpacing:0,textTransform:"none",lineHeight:1,userSelect:"none"}}>?</span>{o&&(<div style={{position:"absolute",bottom:"calc(100% + 8px)",...pos,width:200,padding:"8px 10px",background:"#1c2129",border:"1px solid #30363d",borderRadius:8,fontSize:10.5,fontWeight:400,fontFamily:"'DM Sans',sans-serif",color:"#c9d1d9",lineHeight:1.5,textTransform:"none",letterSpacing:"normal",textAlign:"left",zIndex:100,boxShadow:"0 8px 24px rgba(0,0,0,0.5)",wordWrap:"break-word",whiteSpace:"normal"}}>{ls.map((l,i)=>l===""?<div key={i} style={{height:4}}/>:<div key={i}>{l}</div>)}<div style={{position:"absolute",bottom:-5,...arr,width:8,height:8,background:"#1c2129",borderRight:"1px solid #30363d",borderBottom:"1px solid #30363d",transform:"rotate(45deg)"}}/></div>)}</span>)}
+function IT({text,align}){const[o,sO]=useState(false);const[pin,sP]=useState(false);const[shiftX,setShiftX]=useState(0);const r=useRef(null);const popRef=useRef(null);useEffect(()=>{if(!o)return;const h=e=>{if(r.current&&!r.current.contains(e.target)){sO(false);sP(false)}};document.addEventListener("mousedown",h);document.addEventListener("touchstart",h);return()=>{document.removeEventListener("mousedown",h);document.removeEventListener("touchstart",h)}},[o]);useLayoutEffect(()=>{if(!o){setShiftX(0);return}const el=popRef.current;if(!el)return;const rect=el.getBoundingClientRect(),m=8;let dx=0;if(rect.right>window.innerWidth-m)dx=window.innerWidth-m-rect.right;else if(rect.left<m)dx=m-rect.left;setShiftX(dx)},[o]);const ls=text.split("\n");const pos=align==="left"?{left:-4}:align==="right"?{right:-4}:{left:"50%"};const centerT=align==="left"||align==="right"?"":"translateX(-50%) ";const shiftT=shiftX?"translateX("+shiftX+"px)":"";const popTransform=(centerT+shiftT).trim()||undefined;const arr=align==="left"?{left:12}:align==="right"?{right:12}:{left:"50%",marginLeft:-4};return(<span ref={r} style={{position:"relative",display:"inline-block",marginLeft:3,verticalAlign:"middle"}}><span role="button" tabIndex={0} aria-label="More information" onClick={e=>{e.stopPropagation();sP(v=>{const n=!v;sO(n);return n})}} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();sP(v=>{const n=!v;sO(n);return n})}if(e.key==="Escape"){sP(false);sO(false)}}} onMouseEnter={()=>sO(true)} onMouseLeave={()=>{if(!pin)sO(false)}} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:12,height:12,borderRadius:"50%",border:"1px solid "+(o?tb:"#3d444d"),color:o?tb:tk,fontSize:7.5,fontWeight:700,cursor:"pointer",transition:"all 0.15s",fontFamily:"'DM Sans',sans-serif",letterSpacing:0,textTransform:"none",lineHeight:1,userSelect:"none"}}>?</span>{o&&(<div ref={popRef} style={{position:"absolute",bottom:"calc(100% + 8px)",...pos,transform:popTransform,width:200,padding:"8px 10px",background:"#1c2129",border:"1px solid #30363d",borderRadius:8,fontSize:10.5,fontWeight:400,fontFamily:"'DM Sans',sans-serif",color:"#c9d1d9",lineHeight:1.5,textTransform:"none",letterSpacing:"normal",textAlign:"left",zIndex:100,boxShadow:"0 8px 24px rgba(0,0,0,0.5)",wordWrap:"break-word",whiteSpace:"normal"}}>{ls.map((l,i)=>l===""?<div key={i} style={{height:4}}/>:<div key={i}>{l}</div>)}<div style={{position:"absolute",bottom:-5,...arr,width:8,height:8,background:"#1c2129",borderRight:"1px solid #30363d",borderBottom:"1px solid #30363d",transform:"translateX("+(-shiftX)+"px) rotate(45deg)"}}/></div>)}</span>)}
 
 function Sl({label,value,onChange,min,max,step,format}){return(<div style={{display:"flex",flexDirection:"column",gap:3}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>{label}</span><span style={{fontSize:17,fontFamily:"'Fraunces',serif",fontWeight:600,color:"#e6edf3"}}>{format(value)}</span></div><input type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(parseFloat(e.target.value))} style={{width:"100%",accentColor:tb,height:5,cursor:"pointer"}}/></div>)}
 
@@ -210,8 +210,10 @@ const ltCard={background:LT.card,border:"1px solid "+LT.border,borderRadius:12,b
 
 function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,growth,buildMonths,sqft,utype,rentalMode,strADR,isSTR,isHybrid,strMonths,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[hovPt,setHovPt]=useState(null);
+  const[pinPt,setPinPt]=useState(false);
   const[barYear,setBarYear]=useState(1);
   const[hovPt2,setHovPt2]=useState(null);
+  const[pinPt2,setPinPt2]=useState(false);
   const[showMethod,setShowMethod]=useState(false);
   const chartRef=useRef(null);
   if(!featured)return null;
@@ -311,7 +313,7 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
       </div>
     </div>
 
-    {!hasCustom&&(
+    {!hasCustom&&!isSTR&&(
       <div style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
         <div style={{fontSize:36,marginBottom:12}}>↑</div>
         <div style={{fontSize:17,fontWeight:600,color:LT.text,marginBottom:8}}>Enter your estimated rent to see the analysis</div>
@@ -319,7 +321,7 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
       </div>
     )}
 
-    {hasCustom&&(<>
+    {(hasCustom||isSTR)&&(<>
     {/* HERO outcome card */}
     <div style={{...ltCard,padding:"28px 30px",marginBottom:20}}>
       <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:14}}>Estimated total return</div>
@@ -492,8 +494,8 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
         const step=rangeY<50000?10000:rangeY<200000?50000:100000;
         for(let v=Math.ceil(minY/step)*step;v<=maxY;v+=step)yLabels.push(v);
         return(
-          <div ref={chartRef} style={{position:"relative"}} onMouseLeave={()=>setHovPt(null)}>
-            <svg viewBox={"0 0 "+W+" "+H} style={{width:"100%",height:"auto",maxHeight:240,display:"block"}}>
+          <div ref={chartRef} style={{position:"relative"}}>
+            <svg viewBox={"0 0 "+W+" "+H} style={{width:"100%",height:"auto",maxHeight:240,display:"block"}} onClick={()=>{setPinPt(false);setHovPt(null)}}>
               <defs>
                 <linearGradient id="cfGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#16a34a" stopOpacity="0.25"/>
@@ -514,7 +516,10 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
               {loanAmt>0&&(()=>{const tx=PL+(term/pts[pts.length-1].year)*cW;return(<><line x1={tx} y1={PT} x2={tx} y2={H-PB} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4,3"/><text x={tx} y={PT-6} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="'DM Sans',sans-serif">Loan paid off</text></>)})()}
               {cross&&<><circle cx={cross.x} cy={cross.y} r="5" fill="#16a34a" stroke="#fff" strokeWidth="2"/><text x={cross.x} y={cross.y-12} textAnchor="middle" fontSize="10" fill="#16a34a" fontWeight="600" fontFamily="'DM Sans',sans-serif">Payback yr {cross.year.toFixed(1)}</text></>}
               {pts.filter(p=>p.year%2===0).map((p,i)=><text key={i} x={xC(p)} y={H-PB+12} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="'DM Sans',sans-serif">{"Yr "+p.year}</text>)}
-              {pts.map((p,i)=><circle key={i} cx={xC(p)} cy={yC(p)} r={hovPt===i?7:4.5} fill={p.cum>=0?"#16a34a":"#d97706"} stroke="#fff" strokeWidth={hovPt===i?2.5:1.5} style={{cursor:"pointer",transition:"r 0.1s"}} onMouseEnter={()=>setHovPt(i)} onMouseLeave={()=>setHovPt(null)}/>)}
+              {pts.map((p,i)=>(<g key={i}>
+                <circle cx={xC(p)} cy={yC(p)} r={14} fill="transparent" style={{cursor:"pointer"}} onMouseEnter={()=>{if(!pinPt)setHovPt(i)}} onMouseLeave={()=>{if(!pinPt)setHovPt(null)}} onClick={e=>{e.stopPropagation();setPinPt(true);setHovPt(i)}}/>
+                <circle cx={xC(p)} cy={yC(p)} r={hovPt===i?7:4.5} fill={p.cum>=0?"#16a34a":"#d97706"} stroke="#fff" strokeWidth={hovPt===i?2.5:1.5} style={{pointerEvents:"none",transition:"r 0.1s"}}/>
+              </g>))}
             </svg>
             {hovPt!==null&&pts[hovPt]&&(()=>{
               const p=pts[hovPt];
@@ -563,8 +568,8 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
         const step2=rangeY2<100000?25000:rangeY2<400000?50000:100000;
         for(let v=Math.ceil(minY2/step2)*step2;v<=maxY2;v+=step2)yLabels2.push(v);
         return(
-          <div style={{position:"relative"}} onMouseLeave={()=>setHovPt2(null)}>
-            <svg viewBox={"0 0 "+W+" "+H} style={{width:"100%",height:"auto",maxHeight:270,display:"block"}}>
+          <div style={{position:"relative"}}>
+            <svg viewBox={"0 0 "+W+" "+H} style={{width:"100%",height:"auto",maxHeight:270,display:"block"}} onClick={()=>{setPinPt2(false);setHovPt2(null)}}>
               <defs>
                 <linearGradient id="totGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#2563eb" stopOpacity="0.2"/>
@@ -590,7 +595,10 @@ function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,r
               {/* X-axis year labels */}
               {pts.filter(p=>p.year%2===0).map((p,i)=><text key={i} x={xC2(p)} y={H-PB+12} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="'DM Sans',sans-serif">{"Yr "+p.year}</text>)}
               {/* Data point dots on total return line */}
-              {pts.map((p,i)=><circle key={i} cx={xC2(p)} cy={yC2(p.tot)} r={hovPt2===i?7:4.5} fill="#2563eb" stroke="#fff" strokeWidth={hovPt2===i?2.5:1.5} style={{cursor:"pointer"}} onMouseEnter={()=>setHovPt2(i)} onMouseLeave={()=>setHovPt2(null)}/>)}
+              {pts.map((p,i)=>(<g key={i}>
+                <circle cx={xC2(p)} cy={yC2(p.tot)} r={14} fill="transparent" style={{cursor:"pointer"}} onMouseEnter={()=>{if(!pinPt2)setHovPt2(i)}} onMouseLeave={()=>{if(!pinPt2)setHovPt2(null)}} onClick={e=>{e.stopPropagation();setPinPt2(true);setHovPt2(i)}}/>
+                <circle cx={xC2(p)} cy={yC2(p.tot)} r={hovPt2===i?7:4.5} fill="#2563eb" stroke="#fff" strokeWidth={hovPt2===i?2.5:1.5} style={{pointerEvents:"none"}}/>
+              </g>))}
             </svg>
             {hovPt2!==null&&pts[hovPt2]&&(()=>{
               const p=pts[hovPt2];
