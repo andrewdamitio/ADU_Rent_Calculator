@@ -67,6 +67,8 @@ const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view"&&k!=="featuredIdx");
 function shareUrlFor(state){
   const p=new URLSearchParams();
   SHARE_KEYS.forEach(k=>{const v=state[k],d=DEF[k];if(v===d)return;p.set(k,typeof v==="boolean"?(v?"1":"0"):String(v))});
+  // Shared links open straight into the consumer-facing summary — that's who they're for.
+  p.set("view","consumer");
   const q=p.toString();
   return window.location.origin+window.location.pathname+(q?"?"+q:"");
 }
@@ -81,6 +83,7 @@ function shareParamsFromLocation(){
     else if(typeof d==="number"){const n=parseFloat(raw);if(!Number.isNaN(n))out[k]=n}
     else out[k]=raw.slice(0,200);
   });
+  out.view=p.get("view")==="consumer"?"consumer":"internal";
   return out;
 }
 const tk="#6e7681",tb="#58a6ff",gn="#3fb950",yl="#d29922",rd="#f85149";
@@ -726,7 +729,7 @@ function App(){
     try{
       const shared=shareParamsFromLocation();
       if(shared){
-        setState({...DEF,...shared,view:"internal"});
+        setState({...DEF,...shared});
         window.history.replaceState(null,"",window.location.pathname);
       }else{
         const r=await storage.get(SK);
@@ -956,18 +959,23 @@ function App(){
 
   const headers=["Metro","Rent","Net","Cov.","+/−","CF+","Payback","Equity","Return"];
   const handleReset=async()=>{setState(DEF);try{await storage.delete(SK)}catch(e){}};
+  const dark=view!=="consumer";
   if(!loaded)return(<div style={{fontFamily:"'DM Sans',sans-serif",background:"#0d1117",color:"#8b949e",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet"/>Loading…</div>);
 
   return(
     <div style={{fontFamily:"'DM Sans',sans-serif",background:view==="consumer"?"#f8fafc":"#0d1117",color:view==="consumer"?"#0f172a":"#e6edf3",minHeight:"100vh",padding:"28px 16px",transition:"background 0.2s"}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet"/>
       <div style={{maxWidth:960,margin:"0 auto"}}>
-        {/* VIEW SWITCHER — always visible */}
-        <div className="no-print" style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
-          <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid "+(view==="consumer"?"#cbd5e1":"#30363d"),background:view==="consumer"?"#fff":"#161b22"}}>
-            <button type="button" aria-pressed={view==="internal"} onClick={()=>set("view")("internal")} style={{padding:"6px 14px",fontSize:11,fontWeight:view==="internal"?600:400,cursor:"pointer",userSelect:"none",background:view==="internal"?(view==="consumer"?"#0f172a":"#30363d"):"transparent",color:view==="internal"?(view==="consumer"?"#fff":"#e6edf3"):(view==="consumer"?"#64748b":"#8b949e"),transition:"all 0.15s",border:"none",fontFamily:"inherit"}}>Internal</button>
-            <button type="button" aria-pressed={view==="consumer"} onClick={()=>set("view")("consumer")} style={{padding:"6px 14px",fontSize:11,fontWeight:view==="consumer"?600:400,cursor:"pointer",userSelect:"none",background:view==="consumer"?"#0f172a":"transparent",color:view==="consumer"?"#fff":(view==="consumer"?"#64748b":"#8b949e"),transition:"all 0.15s",border:"none",fontFamily:"inherit"}}>Consumer view</button>
-          </div>
+        {/* VIEW SWITCHER — always visible; the primary choice on this page */}
+        <div className="no-print" role="tablist" aria-label="View mode" style={{display:"flex",gap:6,marginBottom:22,padding:5,borderRadius:14,border:"1px solid "+(dark?"#30363d":"#cbd5e1"),background:dark?"#0d1117":"#eef2f7"}}>
+          <button type="button" role="tab" aria-selected={view==="internal"} onClick={()=>set("view")("internal")} style={{flex:1,padding:"12px 8px",borderRadius:10,cursor:"pointer",userSelect:"none",border:"none",fontFamily:"inherit",transition:"background 0.15s",background:view==="internal"?tb:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+            <span style={{fontSize:14,fontWeight:700,color:view==="internal"?"#0d1117":(dark?"#8b949e":"#64748b")}}>Internal</span>
+            <span style={{fontSize:10,fontWeight:500,color:view==="internal"?"rgba(13,17,23,0.7)":(dark?"#6e7681":"#94a3b8")}}>Full model, every assumption</span>
+          </button>
+          <button type="button" role="tab" aria-selected={view==="consumer"} onClick={()=>set("view")("consumer")} style={{flex:1,padding:"12px 8px",borderRadius:10,cursor:"pointer",userSelect:"none",border:"none",fontFamily:"inherit",transition:"background 0.15s",background:view==="consumer"?LT.info:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+            <span style={{fontSize:14,fontWeight:700,color:view==="consumer"?"#fff":(dark?"#8b949e":"#64748b")}}>Consumer view</span>
+            <span style={{fontSize:10,fontWeight:500,color:view==="consumer"?"rgba(255,255,255,0.8)":(dark?"#6e7681":"#94a3b8")}}>Clean summary to share</span>
+          </button>
         </div>
 
       {view==="internal"&&(<>
