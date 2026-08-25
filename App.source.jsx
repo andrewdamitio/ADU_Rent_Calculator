@@ -275,7 +275,7 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
     {!hasCustom&&(
       <div style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
         <div style={{fontSize:36,marginBottom:12}}>↑</div>
-        <div style={{fontSize:17,fontWeight:600,color:LT.text,marginBottom:8}}>Enter your local rent above to see the analysis</div>
+        <div style={{fontSize:17,fontWeight:600,color:LT.text,marginBottom:8}}>Enter your estimated rent to see the analysis</div>
         <div style={{fontSize:13,color:LT.body,lineHeight:1.6,maxWidth:420,margin:"0 auto"}}>The full breakdown — monthly cash flow, equity buildup, payback period, and stress tests — appears once you provide a rent estimate for your specific area. Even a rough number works; you can refine it later.</div>
       </div>
     )}
