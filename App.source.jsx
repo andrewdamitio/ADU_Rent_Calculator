@@ -62,6 +62,27 @@ const CI={"Metro":"City or metro area.\n\nBase rents are midpoints for a 1BR (60
 
 const DEF={sqft:600,cpsf:250,permits:10000,hookup:8000,foundation:10000,sitePrep:8000,utilTrench:8000,electrical:3000,hardscape:2000,design:8000,surveys:3500,contingency:5,markup:20,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,buildMonths:6,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal",featuredIdx:0};
 const SK="adu-calc-v16";
+// Fields that make up a shareable scenario link — everything except UI-only state.
+const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view"&&k!=="featuredIdx");
+function shareUrlFor(state){
+  const p=new URLSearchParams();
+  SHARE_KEYS.forEach(k=>{const v=state[k],d=DEF[k];if(v===d)return;p.set(k,typeof v==="boolean"?(v?"1":"0"):String(v))});
+  const q=p.toString();
+  return window.location.origin+window.location.pathname+(q?"?"+q:"");
+}
+function shareParamsFromLocation(){
+  const p=new URLSearchParams(window.location.search);
+  if([...p.keys()].length===0)return null;
+  const out={};
+  SHARE_KEYS.forEach(k=>{
+    if(!p.has(k))return;
+    const raw=p.get(k),d=DEF[k];
+    if(typeof d==="boolean")out[k]=raw==="1"||raw==="true";
+    else if(typeof d==="number"){const n=parseFloat(raw);if(!Number.isNaN(n))out[k]=n}
+    else out[k]=raw.slice(0,200);
+  });
+  return out;
+}
 const tk="#6e7681",tb="#58a6ff",gn="#3fb950",yl="#d29922",rd="#f85149";
 const card={background:"#161b22",border:"1px solid #21262d",borderRadius:10};
 
@@ -184,7 +205,7 @@ const SRC=[
 const LT={bg:"#f8fafc",card:"#ffffff",border:"#e2e8f0",borderLight:"#f1f5f9",text:"#0f172a",body:"#475569",muted:"#64748b",mutedLight:"#94a3b8",pos:"#16a34a",posBg:"#dcfce7",info:"#2563eb",infoBg:"#dbeafe",warn:"#d97706",warnBg:"#fef3c7",neg:"#dc2626",negBg:"#fee2e2"};
 const ltCard={background:LT.card,border:"1px solid "+LT.border,borderRadius:12,boxShadow:"0 1px 3px rgba(15,23,42,0.04)"};
 
-function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,growth,buildMonths,sqft,utype,rentalMode,strADR,isSTR,isHybrid,strMonths,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi}){
+function ConsumerView({featured,cm,sens,rows,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,growth,buildMonths,sqft,utype,rentalMode,strADR,isSTR,isHybrid,strMonths,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[hovPt,setHovPt]=useState(null);
   const[barYear,setBarYear]=useState(1);
   const[hovPt2,setHovPt2]=useState(null);
@@ -198,9 +219,12 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
 
   return(<>
     {/* Header */}
-    <div style={{marginBottom:28}}>
+    <div style={{marginBottom:28,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}>
+      <div>
       <h1 style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,letterSpacing:"-0.02em",color:LT.text,margin:"0 0 6px"}}>Your ADU Investment Summary</h1>
       <p style={{fontSize:14,color:LT.body,margin:0,lineHeight:1.5}}>{sqft} sq ft {utype.toLowerCase()} · {fD(total)} project · {rate.toFixed(1)}% / {term}-year financing{cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""}</p>
+      </div>
+      <button onClick={copyShare} className="no-print" style={{background:copied?LT.posBg:LT.card,border:"1px solid "+(copied?LT.pos:LT.border),borderRadius:6,color:copied?LT.pos:LT.body,fontSize:12,fontWeight:500,padding:"7px 12px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"inherit",marginTop:4}}>{copied?"Link copied ✓":"Copy share link"}</button>
     </div>
 
     {/* RENT YOU'D CHARGE — same state as the Internal view */}
@@ -697,9 +721,34 @@ function ConsumerView({featured,cm,sens,rows,featuredIdx,setFeaturedIdx,total,lo
 }
 
 function App(){
-  const[state,setState]=useState(DEF);const[loaded,setLoaded]=useState(false);const[showSources,setShowSources]=useState(false);
-  useEffect(()=>{(async()=>{try{const r=await storage.get(SK);if(r?.value)setState(p=>({...p,...JSON.parse(r.value),view:"internal"}))}catch(e){}setLoaded(true)})()},[]);
+  const[state,setState]=useState(DEF);const[loaded,setLoaded]=useState(false);const[showSources,setShowSources]=useState(false);const[copied,setCopied]=useState(false);
+  useEffect(()=>{(async()=>{
+    try{
+      const shared=shareParamsFromLocation();
+      if(shared){
+        setState({...DEF,...shared,view:"internal"});
+        window.history.replaceState(null,"",window.location.pathname);
+      }else{
+        const r=await storage.get(SK);
+        if(r?.value)setState(p=>({...p,...JSON.parse(r.value),view:"internal"}))
+      }
+    }catch(e){}
+    setLoaded(true)
+  })()},[]);
   useEffect(()=>{if(!loaded)return;(async()=>{try{await storage.set(SK,JSON.stringify({...state,view:"internal"}))}catch(e){}})()},[state,loaded]);
+  const copyShare=useCallback(async()=>{
+    const url=shareUrlFor(state);
+    try{await navigator.clipboard.writeText(url)}catch(e){
+      try{
+        const ta=document.createElement("textarea");
+        ta.value=url;ta.style.position="fixed";ta.style.opacity="0";
+        document.body.appendChild(ta);ta.focus();ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }catch(e2){}
+    }
+    setCopied(true);setTimeout(()=>setCopied(false),1800);
+  },[state]);
   // Auto-feature the custom market whenever the user enters/updates custom info
   useEffect(()=>{if(state.customRent>0)setState(s=>({...s,featuredIdx:0}))},[state.customRent,state.customName]);
   const set=useCallback(k=>v=>setState(s=>({...s,[k]:v})),[]);
@@ -746,8 +795,6 @@ function App(){
     const pmt=cMP(loanAmt,rate/100,term);
     const mPT=(assetCost*(taxRate/100))/12;
     const mIns=(assetCost*(insurance/100))/12;
-    const s=rs(sqft);
-    const sm=isSTR?(strADR*30.4/1900):isHybrid?((strMonths*(strADR*30.4/1900)+(12-strMonths))/12):1;
     const sc=isSTR?strCosts:isHybrid?strCosts*(strMonths/12):0;
     const sv=isSTR?strVacancy:isHybrid?strVacancy*(strMonths/12):0;
     const mg=isSTR?0:isHybrid?mgmt*((12-strMonths)/12):mgmt;
@@ -756,41 +803,13 @@ function App(){
     const opPct=(maint+mg+sc)/100;
     // Break-even gross rent (in table-displayed units, i.e. includes STR mult)
     const beRent=(pmt+mPT+mIns)/((1-vacPct)*(1-opPct));
-    // Convert to LTR-equivalent and to nightly if STR/hybrid
-    const beRentLTR=sm>0?beRent/sm:beRent;
-    const beADR=beRent/30.4;
-    // Helper: count metros where year-1 net >= pmt, given a rent multiplier, rate override, and cost override
-    const stress=(rentMult,rateOver,costMult)=>{
-      const aCost2=assetCost*costMult,total2=aCost2+origFeeAmt;
-      const cashDown2=Math.round(total2*(cashDown/100)),loanAmt2=total2-cashDown2;
-      const r2=rateOver!==null?rateOver:rate/100;
-      const pmt2=cMP(loanAmt2,r2,term);
-      const mPT2=(aCost2*(taxRate/100))/12,mIns2=(aCost2*(insurance/100))/12;
-      let pass=0;
-      allMetros.forEach(m=>{
-        const rent=m.br*s*sm*rentMult;
-        const collected=rent*(1-vacPct);
-        const net=collected*(1-opPct)-mPT2-mIns2;
-        if(net>=pmt2)pass++;
-      });
-      return pass;
-    };
-    const tests=[
-      {label:"Base case",pass:stress(1,null,1),tone:tk},
-      {label:"Rent comes in 10% below est.",pass:stress(0.9,null,1),tone:yl},
-      {label:"Rent comes in 20% below est.",pass:stress(0.8,null,1),tone:rd},
-      {label:"Interest rate +100 bp",pass:stress(1,(rate+1)/100,1),tone:yl},
-      {label:"Interest rate +200 bp",pass:stress(1,(rate+2)/100,1),tone:rd},
-      {label:"Construction costs +15% over budget",pass:stress(1,null,1.15),tone:yl},
-      {label:"Construction costs +25% over budget",pass:stress(1,null,1.25),tone:rd},
-    ];
     // Per-metro margin of safety = (rent - breakeven) / rent
     const margins=rows.map(r=>{
       const m=r.rent>0?((r.rent-beRent)/r.rent)*100:-100;
       return{metro:r.metro,margin:m,rent:r.rent};
     });
-    return{beRent,beRentLTR,beADR,tests,margins,total:allMetros.length};
-  },[loanAmt,rate,term,assetCost,taxRate,insurance,sqft,rentalMode,strADR,strCosts,strVacancy,strMonths,maint,vacancy,mgmt,cashDown,origFeeAmt,rows,allMetros,isSTR,isHybrid]);
+    return{beRent,margins};
+  },[loanAmt,rate,term,assetCost,taxRate,insurance,rentalMode,strCosts,strVacancy,strMonths,maint,vacancy,mgmt,rows]);
 
   // Consumer-view metrics for the featured metro
   const cm=useMemo(()=>{
@@ -952,7 +971,7 @@ function App(){
         </div>
 
       {view==="internal"&&(<>
-        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><button onClick={handleReset} style={{background:"transparent",border:"1px solid #30363d",borderRadius:6,color:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap",marginTop:4,flexShrink:0}} onMouseEnter={e=>{e.target.style.borderColor=tb;e.target.style.color=tb}} onMouseLeave={e=>{e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}>Reset all</button></div>
+        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><div style={{display:"flex",gap:8,flexShrink:0,marginTop:4}}><button onClick={copyShare} style={{background:"transparent",border:"1px solid "+(copied?gn:"#30363d"),borderRadius:6,color:copied?gn:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{if(!copied){e.target.style.borderColor=tb;e.target.style.color=tb}}} onMouseLeave={e=>{if(!copied){e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}}>{copied?"Link copied ✓":"Copy share link"}</button><button onClick={handleReset} style={{background:"transparent",border:"1px solid #30363d",borderRadius:6,color:"#8b949e",fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{e.target.style.borderColor=tb;e.target.style.color=tb}} onMouseLeave={e=>{e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}>Reset all</button></div></div>
 
         {/* COSTS */}
         <div style={{...card,padding:"18px 22px 14px",marginBottom:12}}>
@@ -1202,7 +1221,7 @@ function App(){
         </>);})():(<div style={{...card,marginTop:8,padding:"32px 24px",textAlign:"center"}}><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.6}}>Enter the monthly rent you'd charge above to see the results for this site. Break-even for the project as configured is <strong style={{color:"#e6edf3"}}>{fD(Math.round(sens.beRent))}/mo</strong>.</p></div>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView featured={cm.f} cm={cm} sens={sens} rows={rows} featuredIdx={featuredIdx} setFeaturedIdx={set("featuredIdx")} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} rentalMode={rentalMode} strADR={strADR} isSTR={isSTR} isHybrid={isHybrid} strMonths={strMonths} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} />)}
+      {view==="consumer"&&cm&&(<ConsumerView featured={cm.f} cm={cm} sens={sens} rows={rows} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} rentalMode={rentalMode} strADR={strADR} isSTR={isSTR} isHybrid={isHybrid} strMonths={strMonths} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>
