@@ -179,7 +179,10 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,hookupCity:"ca",saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,cmpOn:false,
+  cmpBOn:true,cmpBName:"30-yr cash-out refi",cmpBRate:7,cmpBTerm:30,cmpBDown:0,cmpBFee:3,
+  cmpCOn:true,cmpCName:"HELOC, 20 yr",cmpCRate:8.5,cmpCTerm:20,cmpCDown:0,cmpCFee:0,
+  cmpDOn:true,cmpDName:"All cash",cmpDRate:0,cmpDTerm:10,cmpDDown:100,cmpDFee:0,hookupCity:"ca",saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -193,8 +196,8 @@ function shareUrlFor(state){
 }
 // Valid ranges for numeric fields. Anything loaded from a URL or storage — or typed into a
 // value — is clamped to these. Cost lines go well past their sliders so a real quote always fits.
-const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],saleYear:[1,30],sellCost:[0,12],incomeTax:[0,50],customRent:[0,100000]};
-const INT_KEYS=new Set(["saleYear","trenchFt","term","strMonths","buildMonths","horizon"]);
+const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,30],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],cmpBRate:[0,25],cmpCRate:[0,25],cmpDRate:[0,25],cmpBTerm:[5,30],cmpCTerm:[5,30],cmpDTerm:[5,30],cmpBDown:[0,100],cmpCDown:[0,100],cmpDDown:[0,100],cmpBFee:[0,40],cmpCFee:[0,40],cmpDFee:[0,40],saleYear:[1,30],sellCost:[0,12],incomeTax:[0,50],customRent:[0,100000]};
+const INT_KEYS=new Set(["cmpBTerm","cmpCTerm","cmpDTerm","saleYear","trenchFt","term","strMonths","buildMonths","horizon"]);
 const ENUMS={hookupCity:["ca","austin","denver","portland"],projectType:Object.keys(PTYPES),siteMode:["facts","dollars"],fdn:["new","existing","none"],slope:["flat","gentle","moderate","steep"],soil:["known","unknown","clay","rock"],access:["open","side","tight"],demo:["none","small","structure"],panel:["room","full","small"],boundary:["needed","have"],rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
 function cleanField(k,raw){
   const d=DEF[k];
@@ -737,6 +740,7 @@ function PrintReport({rep}){
           <td style={{...td,color:i===0?RP.muted:RP.neg}}>{i===0?"—":fShort(t.ret-cm.stress[0].ret)}</td>
         </tr>))}</tbody>
       </table>
+      {rep.cmp&&<><H2>Financing options compared</H2><FinCompareTable cols={rep.cmp} theme="print"/><div style={{fontSize:9,color:RP.muted,marginTop:4}}>Same project, different financing; best figure per row highlighted. Rates are estimates — confirm with lenders.</div></>}
       <div style={{fontSize:9,color:RP.muted,marginTop:4}}>Each test changes one assumption and holds the rest.{cm.stress.some(t=>t.cfAtTerm)?" * Positive only once the loan is paid off.":""}</div>
     </div>
 
@@ -833,6 +837,68 @@ function CostWaterfall({steps,total,buildTotal,sqft,ptypeKey,typeNoun,dark}){
   </div>);
 }
 
+// Financing options compared: each column is the same project run through the model with different
+// financing. Rows are compared at fixed horizons because "at payoff" is a different year per loan.
+const CMP_ALTS=["B","C","D"];
+const CMP_ROWS=[
+  {k:"pmt",label:"Monthly payment",better:"low",fmt:v=>v>0?fD(v)+"/mo":"No loan"},
+  {k:"y1",label:"Year-1 cash flow",better:"high",fmt:v=>(v>=0?"+":"")+fD(v)+"/mo"},
+  {k:"cfPlus",label:"Cash-flow positive",better:"low",fmt:v=>v<=0?"Day one":fYr(v)},
+  {k:"po",label:"Payback",better:"low",fmt:v=>v===0?"Immediate":fYr(v)},
+  {k:"interest",label:"Interest paid",better:"low",fmt:v=>fD(v)},
+  {k:"net15",label:"Net position at 15 years",better:"high",fmt:v=>(v>=0?"+":"")+fShort(v)},
+  {k:"net30",label:"Net position at 30 years",better:"high",fmt:v=>(v>=0?"+":"")+fShort(v)},
+];
+function bestIdx(cols,row){
+  const vals=cols.map(c=>c[row.k]);if(vals.every(v=>v===vals[0]))return-1;
+  const target=row.better==="low"?Math.min(...vals):Math.max(...vals);return vals.indexOf(target);
+}
+// theme: "dark" (Full model), "light" (Summary), "print" (report).
+function FinCompareTable({cols,theme}){
+  const T=theme==="dark"?{text:"#c9d1d9",muted:"#8b949e",strong:"#e6edf3",rule:"#21262d",best:"rgba(63,185,80,0.14)",bestText:gn,font:12}
+    :theme==="light"?{text:LT.body,muted:LT.muted,strong:LT.text,rule:LT.borderLight,best:LT.posBg,bestText:LT.pos,font:12.5}
+    :{text:RP.body,muted:RP.muted,strong:RP.ink,rule:RP.faint,best:"#e8f5ec",bestText:RP.pos,font:9.5};
+  const th={textAlign:"right",padding:"6px 8px",fontSize:T.font-1,color:T.strong,fontWeight:700,verticalAlign:"bottom",borderBottom:"1.5px solid "+(theme==="print"?RP.ink:T.rule)};
+  const td={textAlign:"right",padding:"6px 8px",fontSize:T.font,color:T.text,borderBottom:"1px solid "+T.rule,whiteSpace:"nowrap",fontVariantNumeric:"tabular-nums"};
+  return(<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:cols.length*96+130}}>
+    <thead><tr><th style={{...th,textAlign:"left"}}/>{cols.map(c=><th key={c.key} style={th}>{c.name}<div style={{fontWeight:400,color:T.muted,fontSize:T.font-2}}>{c.down>=100?"All cash":c.rate+"% · "+c.term+" yr"+(c.down>0?" · "+c.down+"% down":"")}{c.fee>0?" · "+c.fee+"% fee":""}</div></th>)}</tr></thead>
+    <tbody>{CMP_ROWS.map(row=>{const b=bestIdx(cols,row);return(<tr key={row.k}>
+      <td style={{...td,textAlign:"left",color:T.muted}}>{row.label}</td>
+      {cols.map((c,i)=><td key={c.key} style={{...td,background:i===b?T.best:"transparent",color:i===b?T.bestText:T.text,fontWeight:i===b?700:400}}>{row.fmt(c[row.k])}</td>)}
+    </tr>)})}</tbody>
+  </table></div>);
+}
+// Editable inputs for one alternative column (Full model).
+function CmpNum({value,onChange,lo,hi,step,label,suffix}){
+  return(<label style={{display:"flex",flexDirection:"column",gap:3,fontSize:10.5,color:"#8b949e"}}>{suffix}
+    <input type="number" aria-label={label} value={value} min={lo} max={hi} step={step} onChange={e=>{const n=parseFloat(e.target.value);if(Number.isFinite(n))onChange(Math.min(hi,Math.max(lo,n)))}}
+      style={{width:"100%",boxSizing:"border-box",padding:"4px 6px",background:"#0d1117",border:"1px solid #30363d",borderRadius:5,color:"#e6edf3",fontSize:12,textAlign:"right",fontFamily:"inherit"}}/>
+  </label>);
+}
+function FinCompare({state,set,cols}){
+  return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+    <Tog on={state.cmpOn} onToggle={()=>set("cmpOn")(!state.cmpOn)} label="Compare financing options" sub="Run the same project with other loans side by side — in the Summary and the printed report too"/>
+    {state.cmpOn&&(<div style={nested}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,190px),1fr))",gap:10}}>
+        {CMP_ALTS.map(a=>{const on=state["cmp"+a+"On"];return(
+          <div key={a} style={{...card,background:"#0d1117",padding:"10px 12px",opacity:on?1:0.55}}>
+            <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#8b949e",marginBottom:6}}><input type="checkbox" checked={on} onChange={()=>set("cmp"+a+"On")(!on)}/>Option {a}</label>
+            <input type="text" aria-label={"Option "+a+" name"} value={state["cmp"+a+"Name"]} onChange={e=>set("cmp"+a+"Name")(e.target.value.slice(0,40))} disabled={!on}
+              style={{width:"100%",boxSizing:"border-box",padding:"5px 8px",background:"#161b22",border:"1px solid #30363d",borderRadius:5,color:"#e6edf3",fontSize:12.5,fontWeight:600,fontFamily:"inherit",marginBottom:8}}/>
+            {on&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              <CmpNum label={"Option "+a+" rate"} value={state["cmp"+a+"Rate"]} onChange={set("cmp"+a+"Rate")} lo={0} hi={25} step={0.125} suffix="Rate %"/>
+              <CmpNum label={"Option "+a+" term"} value={state["cmp"+a+"Term"]} onChange={v=>set("cmp"+a+"Term")(Math.round(v))} lo={5} hi={30} step={1} suffix="Term (years)"/>
+              <CmpNum label={"Option "+a+" down payment"} value={state["cmp"+a+"Down"]} onChange={set("cmp"+a+"Down")} lo={0} hi={100} step={5} suffix="Down %"/>
+              <CmpNum label={"Option "+a+" fee"} value={state["cmp"+a+"Fee"]} onChange={set("cmp"+a+"Fee")} lo={0} hi={40} step={0.5} suffix="Fees %"/>
+            </div>}
+          </div>)})}
+      </div>
+      <div style={{fontSize:11,color:yl,margin:"8px 0 10px",lineHeight:1.45}}>Example rates — replace them with real quotes. "Fees" are closing costs or a loan fee as a share of the build cost, added to the amount financed. Construction interest uses the setting above for every option.</div>
+      <FinCompareTable cols={cols} theme="dark"/>
+    </div>)}
+  </div>);
+}
+
 // Quick-pick buttons under a Summary slider.
 function Presets({value,onPick,options}){
   return(<div className="no-print" style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
@@ -843,7 +909,7 @@ const fieldLabel={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpa
 const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color:LT.text,whiteSpace:"nowrap"};
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
-function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);const[showParts,setShowParts]=useState(false);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -903,8 +969,8 @@ function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,u
               <span style={fieldLabel}>Loan term</span>
               <span style={fieldValue}>{term} years · {rate.toFixed(1)}%</span>
             </div>
-            <input type="range" aria-label="Loan term in years" min={5} max={20} step={1} value={term} onChange={e=>setTerm(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"6px 0 0"}}/>
-            <Presets value={term} onPick={setTerm} options={[[5,"5 yr"],[10,"10 yr"],[15,"15 yr"],[20,"20 yr"]]}/>
+            <input type="range" aria-label="Loan term in years" min={5} max={30} step={1} value={term} onChange={e=>setTerm(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"6px 0 0"}}/>
+            <Presets value={term} onPick={setTerm} options={[[10,"10 yr"],[15,"15 yr"],[20,"20 yr"],[30,"30 yr"]]}/>
             <div style={fieldNote}>{term<=10?"Shorter loans cost more per month but less in total interest.":"Longer loans lower the payment but cost more interest over time."} The rate is set in the Full model.</div>
           </>):(<>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
@@ -1047,6 +1113,13 @@ function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,u
         </div>
       ))}
     </div>
+
+    {/* FINANCING OPTIONS COMPARED (when turned on in the Full model) */}
+    {cmpCols&&<div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+      <div style={{...secH,marginBottom:6}}>Financing options compared</div>
+      <div style={{fontSize:12.5,color:LT.body,marginBottom:12,lineHeight:1.5}}>The same project with different loans. The best figure in each row is highlighted. Rates are estimates — confirm with lenders.</div>
+      <FinCompareTable cols={cmpCols} theme="light"/>
+    </div>}
 
     {/* WHERE THE MONEY GOES */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
@@ -1339,12 +1412,12 @@ function App(){
 
   // Every result on the page comes from runModel. Stress tests rerun it with one assumption shocked.
   const mdl=useMemo(()=>{
-    const mk=({rentMult=1,costMult=1,rateAdd=0,leaseUp=0,conMode=conIntMode}={})=>{
-      const aC=assetCost*costMult,tot=aC+(origFeeOn?Math.round(aC*(origFee/100)):0),down=Math.round(tot*(cashDown/100));
-      return runModel({loanAmt:tot-down,cashDown:down,annRate:(rate+rateAdd)/100,termYr:term,leaseUp,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
+    const mk=({rentMult=1,costMult=1,rateAdd=0,leaseUp=0,conMode=conIntMode,rateAbs=rate,termYr=term,downPct=cashDown,feePct=origFeeOn?origFee:0}={})=>{
+      const aC=assetCost*costMult,tot=aC+Math.round(aC*(feePct/100)),down=Math.round(tot*(downPct/100));
+      return runModel({loanAmt:tot-down,cashDown:down,annRate:(rateAbs+rateAdd)/100,termYr,leaseUp,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
         mPTY1:(aC*(taxRate/100))/12,mInsY1:(insBase*costMult*(insurance/100))/12,rentGrowth:effG,taxGrowthA:taxGrowth/100,insGrowthA:insGrowth/100,taxMarg:incomeTax/100,lossCarry,
         depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*grm,valueGrowth:growth/100,
-        conMode,conRate:(rate+rateAdd+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
+        conMode,conRate:(rateAbs+rateAdd+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
     };
     const base=mk();
     const evalAt=buildMonths+(loanAmt>0?term:horizon)*12;
@@ -1359,8 +1432,13 @@ function App(){
     ].map((sc,i)=>{const r=i===0?base:mk(sc);return{label:sc.label,cfPlus:r.cfPlus,cfAtTerm:r.cfAtTerm,po:r.po,ret:r.at(evalAt).tot}});
     // Each construction-interest option, so the choice can show what it means in dollars.
     const conAlt=loanAmt>0&&buildMonths>0?Object.fromEntries(["paid","cap","none"].map(m=>[m,m===conIntMode?base:mk({conMode:m})])):null;
-    return{base,stress,conAlt};
-  },[lossCarry,loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,insBase,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,grm,growth]);
+    // Financing comparison: the current setup plus each enabled alternative, at fixed horizons.
+    const summarize=(r,c)=>({...c,pmt:r.pmt,y1:r.year(1).net,cfPlus:r.cfPlus,po:r.po,interest:r.months.reduce((t,m)=>t+m.interest,0)+r.conInterest,net15:r.at(180).tot,net30:r.at(360).tot});
+    const cmp=state.cmpOn?[summarize(base,{key:"cur",name:"Your setup",rate,term,down:cashDown,fee:origFeeOn?origFee:0}),
+      ...CMP_ALTS.filter(a=>state["cmp"+a+"On"]).map(a=>{const c={key:a,name:state["cmp"+a+"Name"]||"Option "+a,rate:state["cmp"+a+"Rate"],term:state["cmp"+a+"Term"],down:state["cmp"+a+"Down"],fee:state["cmp"+a+"Fee"]};
+        return summarize(mk({rateAbs:c.rate,termYr:c.term,downPct:c.down,feePct:c.fee}),c)})]:null;
+    return{base,stress,conAlt,cmp};
+  },[state,lossCarry,loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,insBase,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,grm,growth]);
   const M0=mdl.base;
   // The permanent-loan payment, including any construction interest added to the loan.
   const loanPmt=M0.pmt;
@@ -1403,7 +1481,7 @@ function App(){
       // The first card is the same moment as "The full picture" and the verdict (loan payoff, or the
       // chosen horizon when paying cash); the others look further out.
       hero:[{key:"end",label:isCash?"Year "+evalYrs:"At loan payoff",sub:isCash?"":"Year "+(evalK/12).toFixed(1).replace(/\.0$/,""),ret:end.tot,roi:annualized(end.tot,total,evalK/12)},
-        ...[10,15,20,25,30].filter(Y=>Y>=evalK/12+3).slice(0,2).map(Y=>{const s=M0.at(Y*12);return{key:Y,label:Y+" years",sub:"",ret:s.tot,roi:annualized(s.tot,total,Y)}})],
+        ...[10,15,20,25,30,35,40].filter(Y=>Y>=evalK/12+3).slice(0,2).map(Y=>{const s=M0.at(Y*12);return{key:Y,label:Y+" years",sub:"",ret:s.tot,roi:annualized(s.tot,total,Y)}})],
       cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,
       valueY1:ltrRent*grm,valueEnd:end.value,subsidies:M0.subsidies,
       // Operating cash flow only — construction interest paid out of pocket is shown on its own line.
@@ -1456,7 +1534,7 @@ function App(){
       cm,title:customName||unit,
       subtitle:(customName?unit+" · ":"")+strategy[0].toUpperCase()+strategy.slice(1)+" · "+fD(grossY1)+"/mo "+(isSTR?"projected revenue":"rent")+" in year 1",
       date:new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"}),
-      total,loanAmt,cashDownAmt,cashDown,loanPmt,rate,term,evalYrs,incomeTax,buildMonths,verdict,
+      total,loanAmt,cashDownAmt,cashDown,loanPmt,rate,term,evalYrs,incomeTax,buildMonths,verdict,cmp:mdl.cmp,
       costRows:[
         ["Structure ("+sqft+" sq ft × $"+cpsf+")",buildCost],
         ["Site work",siteCost],
@@ -1591,7 +1669,7 @@ function App(){
             <TS label="Cash / equity down" value={cashDown} onChange={set("cashDown")} typeMin={LIM.cashDown[0]} typeMax={LIM.cashDown[1]} min={0} max={100} step={5} format={v=>v===0?"100% financed":v+"% ("+fD(cashDownAmt)+")"} ticks={[{value:0,label:"All loan",color:tb},{value:20,label:"20%",color:tk},{value:50,label:"50/50",color:tk},{value:100,label:"All cash",color:gn}]}/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18}}>
               <Sl label="Interest rate" value={rate} onChange={set("rate")} typeMin={LIM.rate[0]} typeMax={LIM.rate[1]} min={3} max={14} step={0.5} format={v=>v.toFixed(1)+"%"}/>
-              {isCash?<Sl label="Years to evaluate" value={horizon} onChange={set("horizon")} typeMin={LIM.horizon[0]} typeMax={LIM.horizon[1]} min={5} max={30} step={1} format={v=>v+" yr"}/>:<Sl label="Loan term" value={term} onChange={set("term")} typeMin={LIM.term[0]} typeMax={LIM.term[1]} min={5} max={20} step={1} format={v=>v+" yr"}/>}
+              {isCash?<Sl label="Years to evaluate" value={horizon} onChange={set("horizon")} typeMin={LIM.horizon[0]} typeMax={LIM.horizon[1]} min={5} max={30} step={1} format={v=>v+" yr"}/>:<Sl label="Loan term" value={term} onChange={set("term")} typeMin={LIM.term[0]} typeMax={LIM.term[1]} min={5} max={30} step={1} format={v=>v+" yr"}/>}
             </div>
             <div style={{marginTop:2}}>
               <Tog on={origFeeOn} onToggle={()=>set("origFeeOn")(!origFeeOn)} label="Loan origination / dealer fee" sub={origFeeOn?"Baked into the project price — like solar, the fee is invisible to the borrower":"Off — no origination fee (e.g. HELOC, credit union loan)"}/>
@@ -1619,6 +1697,7 @@ function App(){
           <span>{loanAmt>0?"Total repaid: ":"Cash invested: "}<strong style={{color:"#e6edf3"}}>{loanAmt>0?fD(loanPmt*term*12):fD(total)}</strong>{cashDown>0&&loanAmt>0&&<span> + {fD(cashDownAmt)} cash</span>}</span>
           {M0.conInterest>0&&<span>Construction interest: <strong style={{color:"#e6edf3"}}>{fD(M0.conInterest)}</strong> {conIntMode==="paid"?"(paid during build)":"(in the loan)"}</span>}
           </div>
+          <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #21262d"}}><FinCompare state={state} set={set} cols={mdl.cmp||[]}/></div>
         </Section>
 
         {/* 3. REVENUE — what the unit brings in, and what comes off the top of the rent */}
@@ -1795,7 +1874,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} cmpCols={mdl.cmp} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>

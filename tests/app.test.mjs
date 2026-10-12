@@ -240,6 +240,45 @@ describe("construction-period interest", () => {
   });
 });
 
+describe("financing comparison", () => {
+  const table = root => {
+    const t = [...root.querySelectorAll("table")].find(t => /Monthly payment/.test(t.textContent) && /Net position at 15 years/.test(t.textContent));
+    if (!t) return null;
+    const heads = [...t.querySelectorAll("thead th")].slice(1).map(th => th.firstChild.textContent);
+    const rows = Object.fromEntries([...t.querySelectorAll("tbody tr")].map(tr => [tr.children[0].textContent, [...tr.children].slice(1).map(td => td.textContent)]));
+    return { heads, rows, t };
+  };
+  test("off by default; loan terms go to 30 years", async () => {
+    const p = await load("?customRent=2600&term=30&view=consumer");
+    assert.equal(table(p.doc.querySelector(".screen-only")), null);
+    assert.match(p.text(), /Loan term30 years · 7\.5%/);
+  });
+  test("compares the current setup with each alternative, in all three places", async () => {
+    const p = await load("?customRent=2600&cashDown=20&cmpOn=1");
+    const f = table(p.doc.querySelector(".screen-only"));
+    assert.deepEqual(f.heads, ["Your setup", "30-yr cash-out refi", "HELOC, 20 yr", "All cash"]);
+    const pay = f.rows["Monthly payment"].map(v => money(v));
+    assert.ok(pay[1] < pay[0], "a 30-year loan has a lower payment than the 10-year setup");
+    assert.equal(f.rows["Monthly payment"][3], "No loan");
+    assert.equal(f.t.querySelectorAll("td[style*='font-weight: 700']").length, 7, "one best value per row");
+    const c = await load("?customRent=2600&cashDown=20&cmpOn=1&view=consumer");
+    assert.ok(table(c.doc.querySelector(".screen-only")), "Summary card");
+    assert.ok(table(c.report()), "printed report");
+  });
+  test("'Your setup' matches the rest of the page", async () => {
+    const c = await load("?customRent=2600&cashDown=20&cmpOn=1&view=consumer");
+    const f = table(c.doc.querySelector(".screen-only"));
+    assert.equal(f.rows["Net position at 15 years"][0], c.text().match(/15 years([+−]\$[\d.]+k)/)[1]);
+    assert.equal(f.rows["Payback"][0], c.card("Payback period"));
+  });
+  test("alternatives can be renamed, edited and switched off", async () => {
+    const p = await load("?customRent=2600&cmpOn=1&cmpCOn=0&cmpBName=Credit%20union&cmpBRate=6.5");
+    const f = table(p.doc.querySelector(".screen-only"));
+    assert.deepEqual(f.heads, ["Your setup", "Credit union", "All cash"]);
+    assert.match(f.t.textContent, /6\.5% · 30 yr/);
+  });
+});
+
 describe("build period on the net-equity chart", () => {
   test("is shaded and explained when there's a build, and absent when there isn't", async () => {
     const p = await load("?customRent=2600&view=consumer");
