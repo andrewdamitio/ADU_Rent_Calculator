@@ -1,6 +1,6 @@
 // End-to-end tests: load the built index.html in jsdom with a scenario in the URL and
 // check what the page shows. Run with `npm test` (which rebuilds index.html first).
-import { test, describe } from "node:test";
+import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { JSDOM, VirtualConsole } from "jsdom";
@@ -8,6 +8,11 @@ import { JSDOM, VirtualConsole } from "jsdom";
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const SK = "adu-calc-v16";
 const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// Every simulated window is closed after its test; left open they pile up (timers, React roots)
+// until the run slows to a crawl.
+const openDoms = [];
+afterEach(() => { for (const d of openDoms.splice(0)) d.window.close(); });
 
 async function load(qs = "", { stored, clipboard, execCommand } = {}) {
   const errors = [];
@@ -22,6 +27,7 @@ async function load(qs = "", { stored, clipboard, execCommand } = {}) {
       if (execCommand) w.document.execCommand = execCommand;
     },
   });
+  openDoms.push(dom);
   await wait(250);
   const w = dom.window, doc = w.document;
   return {
