@@ -744,6 +744,40 @@ function PrintReport({rep}){
   </div>);
 }
 
+// Typical all-in build cost per sq ft (structure, site work, fees, contingency and builder margin;
+// before any loan fee) by project type — rough 2025–2026 ranges, mostly from California builder
+// pricing in the sources. Used only as a sanity check, never in the math.
+const PSF_RANGE={detached:[350,600],prefab:[300,550],garage:[150,300],attached:[300,550],jadu:[100,250]};
+const WF_COLORS={dark:["#58a6ff","#3fb950","#a371f7","#d29922","#f0883e","#f85149"],light:["#2563eb","#16a34a","#7c3aed","#d97706","#ea580c","#dc2626"]};
+// "Where the money goes": each cost step as a bar starting where the previous one ended, then the
+// total — plus an all-in $/sq ft check against the typical range for the project type.
+function CostWaterfall({steps,total,buildTotal,sqft,ptypeKey,typeNoun,dark}){
+  const c=dark?{text:"#c9d1d9",muted:"#8b949e",track:"#0d1117",rule:"#21262d",strong:"#e6edf3",ok:gn,warn:yl}:{text:LT.body,muted:LT.muted,track:LT.borderLight,rule:LT.borderLight,strong:LT.text,ok:LT.pos,warn:LT.warn};
+  const pal=WF_COLORS[dark?"dark":"light"];
+  const shown=steps.filter(s=>s.amt>0);
+  let cum=0;
+  const psf=sqft>0?buildTotal/sqft:0,[lo,hi]=PSF_RANGE[ptypeKey]||PSF_RANGE.detached;
+  const verdict=psf<lo?"below":psf>hi?"above":"within";
+  const row=(label,left,width,color,amt,bold,key)=>(
+    <div key={key} style={{display:"grid",gridTemplateColumns:"minmax(110px,170px) 1fr 84px",alignItems:"center",gap:10,padding:"4px 0"}}>
+      <span style={{fontSize:12,color:bold?c.strong:c.text,fontWeight:bold?600:400}}>{label}</span>
+      <span style={{position:"relative",height:16,background:c.track,borderRadius:3}}>
+        <span style={{position:"absolute",left:left+"%",width:Math.max(width,0.6)+"%",top:0,bottom:0,background:color,borderRadius:3,opacity:bold?1:0.85}}/>
+      </span>
+      <span style={{fontFamily:"'Fraunces',serif",fontSize:13.5,fontWeight:bold?700:600,color:c.strong,textAlign:"right"}}>{fD(amt)}</span>
+    </div>);
+  return(<div>
+    {shown.map((s,i)=>{const r=row(s.label,cum/total*100,s.amt/total*100,pal[steps.indexOf(s)%pal.length],s.amt,false,s.label);cum+=s.amt;return r})}
+    <div style={{borderTop:"1px solid "+c.rule,marginTop:4}}>{row("Total project cost",0,100,dark?"#6e7681":"#475569",total,true,"total")}</div>
+    <div style={{fontSize:12,color:c.text,marginTop:10,lineHeight:1.5}}>
+      All-in build cost: <strong style={{color:c.strong}}>{fD(psf)}/sq ft</strong>{" — "}
+      <span style={{color:verdict==="within"?c.ok:c.warn}}>{verdict==="within"?"within":verdict==="above"?"above":"below"} the typical {fD(lo)}–{fD(hi)}/sq ft for a {typeNoun}</span>
+      {verdict==="above"?". Check the $/sq ft and site costs — or local pricing may simply run higher.":verdict==="below"?". Make sure nothing is missing.":"."}
+      <IT align="left" text={"Build cost (structure, site work, fees, contingency and builder margin, before any loan fee) divided by the ADU's size. The typical range is a rough 2025–2026 figure for this project type, mostly from California builder pricing — a sanity check only; it isn't used in any calculation."}/>
+    </div>
+  </div>);
+}
+
 // Quick-pick buttons under a Summary slider.
 function Presets({value,onPick,options}){
   return(<div className="no-print" style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
@@ -754,14 +788,14 @@ const fieldLabel={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpa
 const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color:LT.text,whiteSpace:"nowrap"};
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
-function ConsumerView({cm,verdict,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,verdict,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
 
   return(<>
     <PageHeader title="Your ADU Investment Summary" copied={copied} onCopy={copyShare}
-      subtitle={sqft+" sq ft "+utype.toLowerCase()+" "+unitNoun+" · "+fD(total)+" project · "+(loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash")}/>
+      subtitle={sqft+" sq ft "+utype.toLowerCase()+" "+unitNoun+" · "+(origFeeAmt>0?fD(assetCost)+" to build + "+fD(origFeeAmt)+" loan fee = "+fD(total)+" project":fD(total)+" project")+" · "+(loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash")}/>
     {/* THE SHORT ANSWER — the verdict first, before any inputs */}
     {verdict&&(
       <div style={{...ltCard,padding:"20px 24px",marginBottom:16,borderLeft:"4px solid "+(cm.ret>=0?LT.pos:LT.neg)}}>
@@ -828,6 +862,12 @@ function ConsumerView({cm,verdict,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cash
           </>)}
         </div>
       </div>
+      {origFeeAmt>0&&(
+        <div style={{marginTop:16,padding:"10px 14px",borderRadius:8,background:LT.warnBg,fontSize:12.5,color:LT.text,lineHeight:1.5,display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+          <span><strong>Loan origination fee:</strong> {fD(origFeeAmt)} ({origFee}% of the {fD(assetCost)} build cost), added to the project price and financed.</span>
+          <span style={{fontFamily:"'Fraunces',serif",fontWeight:600,whiteSpace:"nowrap"}}>{fD(assetCost)} + {fD(origFeeAmt)} = {fD(total)}</span>
+        </div>
+      )}
     </div>
 
     {!hasCustom&&!isSTR&&(
@@ -849,8 +889,8 @@ function ConsumerView({cm,verdict,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cash
       <div style={{...secH,marginBottom:14}}>Estimated total return</div>
       <div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap"}}>
         {cm.hero.map(h=>{const up=h.ret>=0;return(
-          <div key={h.yrs} style={{flex:"1 1 0",minWidth:90,textAlign:"center",padding:"16px 10px",borderRadius:10,background:up?LT.posBg:LT.negBg,border:"1px solid "+(up?"rgba(34,197,94,0.2)":"rgba(220,38,38,0.2)")}}>
-            <div style={{fontSize:11,color:LT.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{h.yrs} years</div>
+          <div key={h.key} style={{flex:"1 1 0",minWidth:90,textAlign:"center",padding:"16px 10px",borderRadius:10,background:up?LT.posBg:LT.negBg,border:(h.key==="end"?"2px solid ":"1px solid ")+(up?"rgba(34,197,94,"+(h.key==="end"?"0.5":"0.2")+")":"rgba(220,38,38,"+(h.key==="end"?"0.5":"0.2")+")")}}>
+            <div style={{fontSize:11,color:LT.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{h.label}{h.sub&&<span style={{textTransform:"none",letterSpacing:0,fontWeight:500}}> · {h.sub}</span>}</div>
             <div style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,color:up?LT.pos:LT.neg,lineHeight:1,marginBottom:4}}>{up?"+":""}{fK2(h.ret)}</div>
             <div style={{fontSize:11,color:LT.body}}>{h.roi===null?"":(h.roi>=0?"+":"")+h.roi.toFixed(1)+"%/yr"}</div>
           </div>)})}
@@ -951,6 +991,12 @@ function ConsumerView({cm,verdict,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cash
           <div style={{fontSize:12,color:LT.body,lineHeight:1.45}}>{t.s}</div>
         </div>
       ))}
+    </div>
+
+    {/* WHERE THE MONEY GOES */}
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+      <div style={{...secH,marginBottom:12}}>Where the money goes</div>
+      <CostWaterfall steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={ptypeKey} typeNoun={unitNoun}/>
     </div>
 
     {/* PROPERTY VALUE */}
@@ -1174,6 +1220,8 @@ function App(){
   const origFeeAmt=origFeeOn?Math.round(assetCost*(origFee/100)):0;
   const total=assetCost+origFeeAmt;
   const cashDownAmt=Math.round(total*(cashDown/100)),loanAmt=total-cashDownAmt;
+  // Cost steps for the "Where the money goes" breakdown (they sum to the project total).
+  const costSteps=[{label:"Structure",amt:buildCost},{label:"Site work",amt:siteCost},{label:"Fees, design & other",amt:softCostBase},{label:"Contingency",amt:contingencyAmt},{label:"Builder margin",amt:markupAmt},{label:"Loan origination fee",amt:origFeeAmt}];
   const isCash=loanAmt<=0;
   const scale=rs(sqft),utype=ut(sqft);
   // Furnishings (with the GC markup on them) are personal property, not part of the
@@ -1265,7 +1313,10 @@ function App(){
     bars.forEach((b,i)=>{const s=M0.at(buildMonths+12*(i+1));annual.push({year:i+1,rent:b.rent*12,ops:(b.opEx+b.propTax+b.ins)*12,pay:b.pmt*12,tax:b.incomeTax*12,net:b.net*12,cum:s.cash,bal:s.bal,value:s.value,tot:s.tot})});
     return{
       pts,bars,annual,isCash,evalYrs,postLoan:M0.year(isCash?evalYrs:term+1),loanEndYr:M0.loanEnd/12,
-      hero:[10,15,20].map(Y=>{const s=M0.at(Y*12);return{yrs:Y,ret:s.tot,roi:annualized(s.tot,total,Y)}}),
+      // The first card is the same moment as "The full picture" and the verdict (loan payoff, or the
+      // chosen horizon when paying cash); the others look further out.
+      hero:[{key:"end",label:isCash?"Year "+evalYrs:"At loan payoff",sub:isCash?"":"Year "+(evalK/12).toFixed(1).replace(/\.0$/,""),ret:end.tot,roi:annualized(end.tot,total,evalK/12)},
+        ...[10,15,20,25,30].filter(Y=>Y>=evalK/12+3).slice(0,2).map(Y=>{const s=M0.at(Y*12);return{key:Y,label:Y+" years",sub:"",ret:s.tot,roi:annualized(s.tot,total,Y)}})],
       cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,
       valueY1:ltrRent*grm,valueEnd:end.value,subsidies:M0.subsidies,
       // Operating cash flow only — construction interest paid out of pocket is shown on its own line.
@@ -1379,7 +1430,7 @@ function App(){
           <SL>Unit structure</SL>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <TS label="ADU size" badge={utype} value={sqft} onChange={set("sqft")} typeMin={LIM.sqft[0]} typeMax={LIM.sqft[1]} min={300} max={1200} step={50} format={v=>v+" sq ft"} ticks={[{value:400,label:"Studio",color:tk},{value:600,label:"1-bed",color:tb},{value:800,label:"1–2 bed",color:tk},{value:1000,label:"Common cap",color:tk}]}/>
-            <TS label={<>Structure $/sq ft (unit only)<IT align="left" text={"Includes: framing, roofing, siding, insulation, drywall, interior finishes, flooring, cabinets, countertops, windows, doors, interior plumbing fixtures, interior electrical (wiring, outlets, lighting), HVAC, and kitchen appliances (range, dishwasher, and hood are built-in; a standard refrigerator is assumed included too, though it's technically free-standing).\n\nDoes NOT include: foundation, panel upgrades, trenching, hardscape, or furnishing — those are separate below.\n\nPublished \"all-in $/sqft\" figures often bundle site work — use a lower number here."}/></>} value={cpsf} onChange={set("cpsf")} typeMin={LIM.cpsf[0]} typeMax={LIM.cpsf[1]} min={100} max={500} step={10} format={v=>"$"+v+"/ft²"} ticks={[{value:175,label:"Garage conv.",color:tk},{value:220,label:"Prefab",color:tb},{value:300,label:"Stick-built",color:tk},{value:400,label:"Bay Area",color:tk}]}/>
+            <TS label={<>Structure $/sq ft (unit only)<IT align="left" text={"Includes: framing, roofing, siding, insulation, drywall, interior finishes, flooring, cabinets, countertops, windows, doors, interior plumbing fixtures, interior electrical (wiring, outlets, lighting), HVAC, and kitchen appliances (range, dishwasher, and hood are built-in; a standard refrigerator is assumed included too, though it's technically free-standing).\n\nDoes NOT include: foundation, panel upgrades, trenching, hardscape, or furnishing — those are separate below.\n\nPublished \"all-in $/sqft\" figures often bundle site work — use a lower number here."}/></>} value={cpsf} onChange={set("cpsf")} box="Structure cost per sq ft" typeMin={LIM.cpsf[0]} typeMax={LIM.cpsf[1]} min={100} max={500} step={10} format={v=>"$"+v+"/ft²"} ticks={[{value:175,label:"Garage conv.",color:tk},{value:220,label:"Prefab",color:tb},{value:300,label:"Stick-built",color:tk},{value:400,label:"Bay Area",color:tk}]}/>
             <Sub label="Structure subtotal" value={buildCost}/>
           </div>
 
@@ -1401,11 +1452,11 @@ function App(){
 
           <SL>Fees & soft costs</SL>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <TS label={<>Permits, plan check & inspections<IT align="left" text={"Includes plan review and all construction inspections (foundation, framing, rough MEP, insulation, final/CO).\n\nRe-inspection fees if something fails are typically $100–$500 and come out of the builder's margin."}/></>} value={permits} onChange={set("permits")} typeMin={LIM.permits[0]} typeMax={LIM.permits[1]} min={0} max={30000} step={500} format={fD} ticks={[{value:3000,label:"Small / waived",color:gn},{value:7000,label:"Sacramento",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:rd}]}/>
-            <TS label="Water & sewer fees" value={hookup} onChange={set("hookup")} typeMin={LIM.hookup[0]} typeMax={LIM.hookup[1]} min={0} max={60000} step={1000} format={fD} ticks={[{value:0,label:"Waived / incl.",color:gn},{value:4000,label:"San Diego",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:yl},{value:30000,label:"+lateral",color:rd}]}/>
-            <TS label="Design & engineering" value={design} onChange={set("design")} typeMin={LIM.design[0]} typeMax={LIM.design[1]} min={0} max={25000} step={500} format={fD} ticks={[{value:3000,label:"Pre-approved",color:gn},{value:10000,label:"Custom arch.",color:tk},{value:18000,label:"Bay Area",color:tk}]}/>
+            <TS label={<>Permits, plan check & inspections<IT align="left" text={"Includes plan review and all construction inspections (foundation, framing, rough MEP, insulation, final/CO).\n\nRe-inspection fees if something fails are typically $100–$500 and come out of the builder's margin."}/></>} value={permits} onChange={set("permits")} box="Permits, plan check & inspections" typeMin={LIM.permits[0]} typeMax={LIM.permits[1]} min={0} max={30000} step={500} format={fD} ticks={[{value:3000,label:"Small / waived",color:gn},{value:7000,label:"Sacramento",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:rd}]}/>
+            <TS label="Water & sewer fees" value={hookup} onChange={set("hookup")} box="Water & sewer fees" typeMin={LIM.hookup[0]} typeMax={LIM.hookup[1]} min={0} max={60000} step={1000} format={fD} ticks={[{value:0,label:"Waived / incl.",color:gn},{value:4000,label:"San Diego",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:yl},{value:30000,label:"+lateral",color:rd}]}/>
+            <TS label="Design & engineering" value={design} onChange={set("design")} box="Design & engineering" typeMin={LIM.design[0]} typeMax={LIM.design[1]} min={0} max={25000} step={500} format={fD} ticks={[{value:3000,label:"Pre-approved",color:gn},{value:10000,label:"Custom arch.",color:tk},{value:18000,label:"Bay Area",color:tk}]}/>
             {facts?(<div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"baseline"}}><div><div style={{fontSize:12,color:"#8b949e"}}>Surveys & reports</div><div style={{fontSize:11,color:"#6e7681"}}>From site facts: {sf.why.surveys}</div></div><span style={{fontSize:15,fontFamily:"'Fraunces',serif",fontWeight:600,color:"#e6edf3"}}>{surveys===0?"Not required":fD(surveys)}</span></div>):<TS label={<>Surveys & reports<IT align="left" text="A land survey confirms your property lines and where the ADU can legally sit. A soil report (geotechnical study) tells the engineer what kind of foundation the ground actually needs — required on many hillside or unstable-soil lots, skippable on a flat, already-documented one."/></>} value={surveys} onChange={set("surveys")} box="Surveys & reports" typeMin={LIM.surveys[0]} typeMax={LIM.surveys[1]} min={0} max={12000} step={500} format={v=>v===0?"Not required":fD(v)} ticks={[{value:0,label:"Not req'd",color:gn},{value:1500,label:"Survey only",color:tk},{value:3500,label:"Survey + soil",color:tb},{value:7000,label:"Full geotech",color:yl}]}/>}
-            <TS label={<>Furnishing<IT align="left" text={(hasSTR?"Furniture, linens, kitchenware, decor — everything a guest needs. The range, dishwasher, and refrigerator are already in structure $/sqft.":"Washer/dryer, furniture, or other extras beyond what the builder installs. The range, dishwasher, and refrigerator are already in structure $/sqft. Set to $0 if tenant-supplied.")+"\n\nFurnishings are not depreciated with the building in this model. Expect to replace them every 5–7 years ("+(hasSTR?"sooner with heavy guest turnover":"sooner with hard use")+") — budget for that from the maintenance reserve."}/></>} value={furnishing} onChange={set("furnishing")} typeMin={LIM.furnishing[0]} typeMax={LIM.furnishing[1]} min={0} max={25000} step={1000} format={v=>v===0?"Unfurnished":fD(v)} ticks={hasSTR?[{value:0,label:"Unfurnished",color:gn},{value:5000,label:"Basic",color:tk},{value:10000,label:"Standard",color:tb},{value:18000,label:"Design-forward",color:yl}]:[{value:0,label:"Unfurnished",color:gn},{value:1500,label:"Washer/dryer",color:tk},{value:5000,label:"Partial",color:tb},{value:12000,label:"Fully furnished",color:yl}]}/>
+            <TS label={<>Furnishing<IT align="left" text={(hasSTR?"Furniture, linens, kitchenware, decor — everything a guest needs. The range, dishwasher, and refrigerator are already in structure $/sqft.":"Washer/dryer, furniture, or other extras beyond what the builder installs. The range, dishwasher, and refrigerator are already in structure $/sqft. Set to $0 if tenant-supplied.")+"\n\nFurnishings are not depreciated with the building in this model. Expect to replace them every 5–7 years ("+(hasSTR?"sooner with heavy guest turnover":"sooner with hard use")+") — budget for that from the maintenance reserve."}/></>} value={furnishing} onChange={set("furnishing")} box="Furnishing" typeMin={LIM.furnishing[0]} typeMax={LIM.furnishing[1]} min={0} max={25000} step={1000} format={v=>v===0?"Unfurnished":fD(v)} ticks={hasSTR?[{value:0,label:"Unfurnished",color:gn},{value:5000,label:"Basic",color:tk},{value:10000,label:"Standard",color:tb},{value:18000,label:"Design-forward",color:yl}]:[{value:0,label:"Unfurnished",color:gn},{value:1500,label:"Washer/dryer",color:tk},{value:5000,label:"Partial",color:tb},{value:12000,label:"Fully furnished",color:yl}]}/>
             <Sub label="Soft cost subtotal" value={softCostBase}/>
           </div>
 
@@ -1418,6 +1469,9 @@ function App(){
           <SL>Builder / GC margin</SL>
           <TS label={<>Markup on project<IT align="left" text="The general contractor's profit and overhead on top of raw materials and labor — it's how a builder stays in business, covers insurance, permits paperwork, and project management, and absorbs the risk of things going wrong. 0% (owner-builder) means you're acting as your own GC and only paying subcontractors directly."/></>} value={markup} onChange={set("markup")} typeMin={LIM.markup[0]} typeMax={LIM.markup[1]} min={0} max={40} step={1} format={v=>v===0?"Owner-builder":v+"% ("+fD(markupAmt)+")"} ticks={[{value:0,label:"Owner-builder",color:gn},{value:10,label:"Prefab co.",color:tb},{value:20,label:"Typical GC",color:tk},{value:25,label:"Design-build",color:yl},{value:35,label:"Premium",color:rd}]}/>
           {origFeeOn&&origFeeAmt>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 1px",borderTop:"1px solid #21262d",marginTop:6}}><span style={{fontSize:11.5,color:yl}}>+ Dealer fee ({origFee}%)</span><span style={{fontSize:13,fontFamily:"'Fraunces',serif",fontWeight:600,color:yl}}>{fD(origFeeAmt)}</span></div>}
+
+          <SL>Where the money goes</SL>
+          <CostWaterfall dark steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={projectType} typeNoun={ptype.noun}/>
         </Section>
 
         {/* RENTAL STRATEGY */}
@@ -1622,7 +1676,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} verdict={rep?rep.verdict:null} rentY1={grossY1} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} verdict={rep?rep.verdict:null} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>

@@ -151,7 +151,7 @@ describe("one simulation, consistent numbers", () => {
     assert.ok(Math.abs((Math.pow(1 + gain / total, 1 / 20) - 1) * 100 - parseFloat(m[3])) < 0.15);
   });
   test("build months shift results", async () => {
-    const hero = async bm => (await load(`?customRent=2600&buildMonths=${bm}&conIntMode=none&view=consumer`)).text().match(/10 years([+−]\$[\d.]+k)/)[1];
+    const hero = async bm => (await load(`?customRent=2600&buildMonths=${bm}&conIntMode=none&view=consumer`)).text().match(/15 years([+−]\$[\d.]+k)/)[1];
     assert.notEqual(await hero(0), await hero(12));
   });
   test("operating-expense % uses the user's rent", async () => {
@@ -393,17 +393,64 @@ describe("budget confidence", () => {
   });
 });
 
+// Dollar input boxes, found by their accessible label ("<line> in dollars").
+const box = (p, label) => [...p.doc.querySelectorAll("input[aria-label]")].find(i => i.getAttribute("aria-label") === label + " in dollars") ?? null;
+async function enter(p, label, text, key) {
+  const el = box(p, label);
+  el.focus(); el.dispatchEvent(new p.w.FocusEvent("focusin", { bubbles: true })); await wait(20);
+  Object.getOwnPropertyDescriptor(p.w.HTMLInputElement.prototype, "value").set.call(el, text);
+  el.dispatchEvent(new p.w.Event("input", { bubbles: true }));
+  if (key) el.dispatchEvent(new p.w.KeyboardEvent("keydown", { key, bubbles: true }));
+  el.blur(); el.dispatchEvent(new p.w.FocusEvent("focusout", { bubbles: true }));
+  await wait(60);
+}
+
+describe("where the money goes", () => {
+  const steps = el => [...el.querySelectorAll("div[style*='grid-template-columns']")].map(r => [r.children[0]?.textContent, money(r.children[2]?.textContent)]).filter(([l, v]) => l && !Number.isNaN(v));
+  test("the steps add up to the total, in both views", async () => {
+    for (const view of ["internal", "consumer"]) {
+      const p = await load("?customRent=2600&origFeeOn=1&furnishing=5000&view=" + view);
+      const h = [...p.doc.querySelectorAll(".screen-only div")].find(d => /^Where the money goes$/i.test(d.textContent));
+      const card = view === "internal" ? h.nextElementSibling : h.parentElement;
+      const r = steps(card), total = r.find(([l]) => l === "Total project cost")[1];
+      assert.equal(r.filter(([l]) => l !== "Total project cost").reduce((s, [, v]) => s + v, 0), total, view);
+      assert.ok(r.some(([l]) => l === "Loan origination fee"), view + " shows the loan fee step");
+    }
+  });
+  test("checks all-in $/sq ft against the typical range for the type", async () => {
+    assert.match((await load("?customRent=2600")).text(), /All-in build cost: \$499\/sq ft — within the typical \$350–\$600\/sq ft for a detached ADU/);
+    assert.match((await load("?customRent=2600&cpsf=600")).text(), /above the typical \$350–\$600\/sq ft for a detached ADU\. Check the \$\/sq ft/);
+    assert.match((await load("?customRent=2600&cpsf=100&siteMode=dollars&foundation=0&sitePrep=0&utilTrench=0&electrical=0&hardscape=0")).text(), /below the typical .*Make sure nothing is missing/);
+  });
+});
+
+describe("loan origination fee in the Summary", () => {
+  test("shows build cost + fee = project cost when the fee is on", async () => {
+    const t = (await load("?customRent=2600&origFeeOn=1&origFee=5&view=consumer")).text();
+    assert.match(t, /\$299,150 to build \+ \$14,958 loan fee = \$314,108 project/);
+    assert.match(t, /Loan origination fee: \$14,958 \(5% of the \$299,150 build cost\), added to the project price and financed\./);
+  });
+  test("is absent when there's no fee", async () => {
+    assert.doesNotMatch((await load("?customRent=2600&view=consumer")).text(), /loan fee|origination fee/i);
+  });
+});
+
+describe("total return headline", () => {
+  test("the first card is the same figure as the full picture and the verdict", async () => {
+    const p = await load("?customRent=2600&cashDown=20&view=consumer");
+    const t = p.text();
+    const hero = t.match(/At loan payoff · Year 10\.5([+−]\$[\d.]+k)/)[1];
+    const picture = t.match(/Total return[^+−]*([+−]\$[\d.]+k)✓/)[1];
+    assert.equal(hero, picture);
+    assert.match(t, new RegExp("builds an estimated \\" + hero.replace("+", "").replace(".", "\\.") + " of net equity by loan payoff"));
+    assert.match(t, /At loan payoff · Year 10\.5.*15 years.*20 years/);
+  });
+  test("all-cash projects headline the chosen horizon", async () => {
+    assert.match((await load("?customRent=2600&cashDown=100&horizon=15&view=consumer")).text(), /Estimated total returnYear 15[+−]\$[\d.]+k.*20 years.*25 years/);
+  });
+});
+
 describe("dollar amounts mode", () => {
-  const box = (p, label) => [...p.doc.querySelectorAll("input[aria-label]")].find(i => i.getAttribute("aria-label") === label + " in dollars") ?? null;
-  const enter = async (p, label, text, key) => {
-    const el = box(p, label);
-    el.focus(); el.dispatchEvent(new p.w.FocusEvent("focusin", { bubbles: true })); await wait(20);
-    Object.getOwnPropertyDescriptor(p.w.HTMLInputElement.prototype, "value").set.call(el, text);
-    el.dispatchEvent(new p.w.Event("input", { bubbles: true }));
-    if (key) el.dispatchEvent(new p.w.KeyboardEvent("keydown", { key, bubbles: true }));
-    el.blur(); el.dispatchEvent(new p.w.FocusEvent("focusout", { bubbles: true }));
-    await wait(60);
-  };
   test("every site line has a visible dollar box", async () => {
     const p = await load("?customRent=2600&siteMode=dollars");
     for (const l of ["Foundation", "Grading, demo & access", "Utility trenching", "Electrical panel upgrade", "Hardscape & path", "Surveys & reports"])
@@ -444,19 +491,22 @@ describe("typed values", () => {
     input.blur?.(); input.dispatchEvent(new p.w.FocusEvent("focusout", { bubbles: true }));
     await wait(60);
   };
-  test("an exact quote can be typed, with $ , and k shorthand", async () => {
-    const p = await load("?customRent=2600&siteMode=dollars");
-    await typeInto(p, "Permits", "$11,240");
+  test("every cost line has a dollar box; quotes can be typed with $ , and k", async () => {
+    const p = await load("?customRent=2600");
+    for (const l of ["Structure cost per sq ft", "Permits, plan check & inspections", "Water & sewer fees", "Design & engineering", "Furnishing"]) assert.ok(box(p, l), l);
+    await enter(p, "Permits, plan check & inspections", "$11,240");
     assert.equal(p.saved().permits, 11240);
-    await typeInto(p, "Design & engineering", "12.5k");
+    await enter(p, "Design & engineering", "12.5k");
     assert.equal(p.saved().design, 12500);
-    assert.match(p.text(), /Design & engineering\$12,500/);
+    assert.equal(box(p, "Design & engineering").value, "12,500");
+    await enter(p, "Structure cost per sq ft", "287");
+    assert.equal(p.saved().cpsf, 287);
   });
   test("typed values can exceed the slider's range, within the field's limits", async () => {
     const p = await load("?customRent=2600");
-    await typeInto(p, "Water & sewer fees", "85000");
+    await enter(p, "Water & sewer fees", "85000");
     assert.equal(p.saved().hookup, 85000, "slider stops at $60k");
-    await typeInto(p, "Water & sewer fees", "9999999");
+    await enter(p, "Water & sewer fees", "9999999");
     assert.equal(p.saved().hookup, 300000, "clamped to the field limit");
   });
   test("decimals are kept where the slider allows them; garbage and Escape change nothing", async () => {
@@ -468,7 +518,7 @@ describe("typed values", () => {
   });
   test("a typed value beyond the slider survives a share link", async () => {
     const p = await load("?customRent=2600&permits=45000");
-    assert.match(p.text(), /Permits, plan check & inspections\?\$45,000/);
+    assert.equal(box(p, "Permits, plan check & inspections").value, "45,000");
   });
 });
 
