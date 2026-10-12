@@ -155,7 +155,7 @@ describe("one simulation, consistent numbers", () => {
     assert.notEqual(await hero(0), await hero(12));
   });
   test("operating-expense % uses the user's rent", async () => {
-    const pct = async r => (await load(`?customRent=${r}`)).text().match(/Eff\. rate(\d+)%/)[1];
+    const pct = async r => (await load(`?customRent=${r}`)).text().match(/(\d+)% of rent to expenses/)[1];
     assert.notEqual(await pct(1500), await pct(4000));
   });
 });
@@ -249,11 +249,21 @@ describe("Full model layout", () => {
   test("inputs on the left, rent field and results on the right, reference below", async () => {
     const { doc } = await load("?customRent=2600");
     const grid = doc.querySelector(".int-grid");
-    assert.ok(grid.querySelector(".int-inputs").textContent.includes("Project Costs"));
+    assert.ok(grid.querySelector(".int-inputs").textContent.includes("Construction cost"));
     const results = grid.querySelector(".int-results");
     assert.ok(results.querySelector("#rentAmt"));
     assert.match(results.textContent, /Break-even rent.*Payback/);
     assert.ok(!grid.textContent.includes("Reading the results"), "legend sits below the grid");
+  });
+  test("sections follow build → finance → revenue → taxes & insurance → value", async () => {
+    const { doc } = await load("?customRent=2600");
+    const sections = [...doc.querySelectorAll(".int-inputs [role=button][aria-expanded]")].map(b => b.firstElementChild.textContent);
+    assert.deepEqual(sections, ["Construction cost", "Financing", "Revenue", "Taxes & insurance", "Value & selling"]);
+    const sectionText = name => [...doc.querySelectorAll(".int-inputs [role=button][aria-expanded]")].find(b => b.firstElementChild.textContent === name).parentElement.textContent;
+    assert.match(sectionText("Construction cost"), /Build timeConstruction period/);
+    assert.match(sectionText("Revenue"), /Annual rent growth.*Vacancy allowance.*Property management.*Maintenance reserve/);
+    assert.match(sectionText("Taxes & insurance"), /Property tax.*Property tax growth.*Insurance.*Insurance growth.*Marginal income tax rate/);
+    assert.match(sectionText("Value & selling"), /Value multiplier/);
   });
   test("narrow-screen bar shows rent vs. break-even and payback", async () => {
     const { doc } = await load("?customRent=2600");
