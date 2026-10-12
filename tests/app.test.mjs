@@ -176,9 +176,9 @@ describe("cost model", () => {
 describe("construction-period interest", () => {
   const readout = t => t.match(/About (\$[\d,]+) of interest over the (\d+)-month build, on an average drawn balance of (\$[\d,]+)/);
   test("interest accrues on the S-curve draw balance", async () => {
-    // Defaults: $261,650 project, $0 down, 6 months, 7.5%. Soft costs ($35,400 with markup) are drawn
-    // up front and hard costs follow the S-curve, so the average drawn balance is ~48% of the loan.
-    const m = readout((await load("?customRent=2600")).text());
+    // $250/sq ft gives a $261,650 project, $0 down, 6 months, 7.5%. Soft costs ($35,400 with markup) are
+    // drawn up front and hard costs follow the S-curve, so the average drawn balance is ~48% of the loan.
+    const m = readout((await load("?customRent=2600&cpsf=250")).text());
     assert.ok(m, "readout shown");
     assert.ok(Math.abs(money(m[1]) - 4686) <= 2, m[1]);
     assert.ok(Math.abs(money(m[3]) - 124957) <= 5, m[3]);
@@ -253,21 +253,22 @@ describe("project-type templates", () => {
     assert.equal(s.sqft, 400);
     assert.equal(s.hookup, 0, "no utility connection fee for converted space");
     assert.equal(s.sitePrep, 1000);
-    assert.match(p.text(), /Total est\.\$1\d\d,\d{3}/, "a garage conversion costs far less than the $261,650 detached default");
+    assert.match(p.text(), /Total est\.\$1\d\d,\d{3}/, "a garage conversion costs far less than the detached default");
     assert.doesNotMatch(p.text(), /Customized from/);
   });
   test("a junior ADU needs no foundation, grading or trenching", async () => {
     const p = await load("?customRent=1600");
     await pick(p, "Junior ADU");
     const t = p.text();
-    assert.match(t, /Foundation\?Existing/);
-    assert.match(t, /Grading, demo & accessNone/);
-    assert.match(t, /Utility trenchingNone \(existing\)/);
+    assert.match(t, /FoundationInside the existing house — no foundation work\$0/);
+    assert.match(t, /Grading, demo & accessNo site work\$0/);
+    assert.match(t, /Utility trenchingUses the house's existing utilities\$0/);
   });
   test("editing a line marks the template customized, and reset restores it", async () => {
-    const p = await load("?projectType=prefab&cpsf=220&foundation=8000&sitePrep=9000&permits=9000&design=3000&markup=10&buildMonths=4&customRent=2600");
+    const prefab = "?projectType=prefab&permits=9000&design=3000&markup=10&buildMonths=4&access=open&crane=1&customRent=2600";
+    const p = await load(prefab + "&cpsf=220");
     assert.doesNotMatch(p.text(), /Customized from/);
-    const p2 = await load("?projectType=prefab&cpsf=260&foundation=8000&sitePrep=9000&permits=9000&design=3000&markup=10&buildMonths=4&customRent=2600");
+    const p2 = await load(prefab + "&cpsf=260");
     assert.match(p2.text(), /Customized from the prefab \/ modular template/);
     await p2.click("Reset to template");
     assert.equal(p2.saved().cpsf, 220);
@@ -277,6 +278,51 @@ describe("project-type templates", () => {
     const p = await load("?customRent=2000&projectType=garage&sqft=400&view=consumer");
     assert.match(p.text(), /400 sq ft studio garage conversion/);
     assert.match(p.report().textContent, /400 sq ft studio garage conversion/);
+  });
+});
+
+describe("site facts", () => {
+  const breakdown = t => Object.fromEntries([...t.matchAll(/(Foundation|Grading, demo & access|Utility trenching|Electrical|Surveys & reports)(?: \(counted in soft costs\))?([^$]*?)(\$[\d,]+)/g)].map(m => [m[1], money(m[3])]));
+  test("the default facts reproduce the default site-work dollars", async () => {
+    const p = await load("?customRent=2600");
+    const b = breakdown(p.text());
+    assert.deepEqual(b, { "Foundation": 10000, "Grading, demo & access": 8000, "Utility trenching": 8000, "Electrical": 3000, "Surveys & reports": 3500 });
+    assert.match(p.text(), /Site subtotal\$31,000/);
+  });
+  test("a steep lot on expansive clay costs what it should", async () => {
+    const b = breakdown((await load("?customRent=2600&slope=steep&soil=clay")).text());
+    assert.equal(b["Foundation"], 43500, "600 sq ft × $58 × 1.25");
+    assert.equal(b["Grading, demo & access"], 16000, "side-yard access + steep grading");
+    assert.equal(b["Surveys & reports"], 7000, "boundary survey + full geotechnical report");
+  });
+  test("a long run through rock with a sewer pump and gas line", async () => {
+    const b = breakdown((await load("?customRent=2600&soil=rock&trenchFt=150&sewerPump=1&gasLine=1")).text());
+    assert.equal(b["Utility trenching"], 150 * 100 * 1.6 + 8000 + 150 * 20);
+  });
+  test("a small panel with an all-electric unit needs a service upgrade", async () => {
+    assert.equal(breakdown((await load("?customRent=2600&panel=small")).text())["Electrical"], 5000 + 1000 + 1500);
+  });
+  test("switching to dollar amounts keeps the numbers the facts produced", async () => {
+    const p = await load("?customRent=2600&slope=steep&soil=clay");
+    const before = p.text().match(/Total est\.(\$[\d,]+)/)[1];
+    await p.click("Enter dollar amounts");
+    assert.equal(p.saved().foundation, 43500);
+    assert.equal(p.saved().siteMode, "dollars");
+    assert.equal(p.text().match(/Total est\.(\$[\d,]+)/)[1], before);
+    assert.match(p.text(), /Foundation\?\$43,500/);
+  });
+  test("each template's facts produce its site costs, and editing a fact marks it customized", async () => {
+    const p = await load("?customRent=2000");
+    const b = [...p.doc.querySelectorAll("[role=radiogroup][aria-labelledby=ptype-label] button")].find(b => b.textContent.startsWith("Garage conversion"));
+    b.click(); await wait(60);
+    assert.equal(breakdown(p.text())["Foundation"], 3000);
+    assert.doesNotMatch(p.text(), /Customized from/);
+    const slope = [...p.doc.querySelectorAll("[role=radiogroup][aria-label=Demolition] button")].find(b => b.textContent === "Shed or patio");
+    slope.click(); await wait(60);
+    assert.match(p.text(), /Customized from the garage conversion template/);
+  });
+  test("the report says how site work was estimated", async () => {
+    assert.match((await load("?customRent=2600")).report().textContent, /Site work is estimated from site facts — foundation: 600 sq ft slab on flat ground.*electrical: subpanel off a 200A panel/);
   });
 });
 
@@ -295,7 +341,7 @@ describe("typed values", () => {
     await wait(60);
   };
   test("an exact quote can be typed, with $ , and k shorthand", async () => {
-    const p = await load("?customRent=2600");
+    const p = await load("?customRent=2600&siteMode=dollars");
     await typeInto(p, "Permits", "$11,240");
     assert.equal(p.saved().permits, 11240);
     await typeInto(p, "Foundation", "12.5k");
@@ -347,7 +393,7 @@ describe("printed report", () => {
   test("leads with a verdict and key figures that match the screen", async () => {
     const p = await load("?customRent=2600&cashDown=20&view=consumer");
     const t = p.report().textContent;
-    assert.match(t, /At \$2,600\/mo rent, this \$261,650 project needs about \$\d[\d,]*\/mo of support in its first rental year, turns cash-flow positive in year [\d.]+, pays back everything invested by year [\d.]+, and builds an estimated/);
+    assert.match(t, /At \$2,600\/mo rent, this \$[\d,]+ project needs about \$\d[\d,]*\/mo of support in its first rental year, turns cash-flow positive in year [\d.]+(?: \(once the loan is paid off\))?, pays back everything invested by year [\d.]+, and builds an estimated/);
     assert.ok(t.includes(p.card("Payback period")), "payback matches");
   });
   test("cost table adds up to the total", async () => {

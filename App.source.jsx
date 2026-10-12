@@ -110,25 +110,73 @@ const fK=n=>{const a=Math.abs(n),s=n<0?"-":"+";return a>=1000?s+"$"+Math.round(a
 
 const CI={"Rent":"Year-1 monthly rent at the current ADU size, as entered.\n\nIf STR mode is on, revenue is the nightly rate × 30.4 nights (before unbooked nights).","Net":"First-month rent minus operating expenses (pre-tax).\n\nProperty tax, insurance, maintenance, vacancy, management.","Cov.":"First-month pre-tax net rent ÷ loan payment.\n\nIgnores equity, rent growth, and income tax.\n100% = breakeven monthly.","+/−":"First-month pre-tax net rent minus loan payment.\n\nDoes NOT reflect rent growth or taxes.\n\nGreen = passive income.\nRed = monthly subsidy.","CF+":"Years from project start until monthly cash flow turns positive: rent after expenses and income tax, minus the loan payment.\n\n'Now' = positive from the first rent check.\n* = only turned positive because the loan ended.\n\nAccounts for rent growth AND income tax (interest + depreciation deductions shrink over time).","Payback":"Years from project start until the ADU has paid back every dollar you put in: your down payment plus any months where you covered a shortfall.\n\nUses after-tax cash flow after loan payments, so financing costs count. 'Immediate' = $0 down and never out of pocket.\n\nGreen ≤ term. Yellow ≤ 1.5×.\nRed = longer.","Equity":"Rough estimate of value added on day one, using a GRM of 110× monthly rent.\n\nSimplified heuristic — real appraisers use sales comparables first, income approach as a cross-check. The right multiplier varies sharply: coastal CA and Seattle have GRMs of 200–300×, so this likely understates value there. Midwest markets are closer to 80–120×.\n\nAlways uses LTR rent, not STR income.\n\nGreen = gross estimate exceeds ADU cost.","Return":"Your net position when the loan is paid off: the ADU's estimated value at that point, plus cumulative after-tax cash flow, minus your down payment.\n\nThe first % is the compound annual return on TOTAL PROJECT COST from project start to loan payoff (construction included) — the denominator is the full cost whether you financed it or not.\n\nThe second is the same on the cash you actually put in. It is undefined at 0% down, where you invested nothing."};
 
+// Site work worked out from facts about the lot instead of raw dollar amounts. Typical
+// 2025–2026 unit costs, set so the default detached scenario matches the earlier dollar defaults:
+//  - Foundation, per sq ft of footprint by slope: slab on flat ground ~$16.70, stepped slab $20,
+//    raised/crawl-space $30, engineered hillside $58. ×1.25 for expansive clay (post-tensioned
+//    slab), ×1.15 for rock (excavation). An existing slab needs footing and moisture work, ~$7.50/sq ft.
+//  - Grading & access: base by how equipment reaches the site, plus slope grading, a crane set
+//    for prefab/modular units, and demolition.
+//  - Trenching: ~$100/ft for one shared water/sewer/electric trench, ×1.6 in rock, +$8k for a
+//    sewer ejector pump when the ADU sits below the main, +$20/ft for a gas line.
+//  - Electrical: by headroom in the existing panel, plus capacity for an all-electric unit.
+//  - Surveys: a boundary survey unless one is on file; a soil report for new foundations unless
+//    the soil is known, upgraded to a full geotechnical report on steep lots.
+const SITE={
+  fdnRate:{flat:16.7,gentle:20,moderate:30,steep:58},soilMult:{known:1,unknown:1,clay:1.25,rock:1.15},existingSlab:7.5,
+  access:{open:3000,side:8000,tight:15000},slopeGrade:{flat:0,gentle:1500,moderate:4000,steep:8000},crane:6000,
+  demo:{none:0,small:3000,structure:10000},prepExisting:1000,
+  trenchPerFt:100,rockTrench:1.6,pump:8000,gasPerFt:20,
+  panel:{room:2000,full:4000,small:5000},allElectric:1000,smallAllElectric:1500,
+  boundary:1500,soilReport:2000,geotech:5500,
+};
+const FACT_KEYS=["fdn","slope","soil","access","crane","demo","trenchFt","sewerPump","gasLine","panel","allElectric","boundary"];
+const SITE_KEYS=["foundation","sitePrep","utilTrench","electrical","surveys"];
+const r100=x=>Math.round(x/100)*100;
+function siteFromFacts(f,sqft){
+  const isNew=f.fdn==="new",inside=f.fdn==="none",rock=f.soil==="rock";
+  const foundation=inside?0:f.fdn==="existing"?r100(sqft*SITE.existingSlab):r100(sqft*SITE.fdnRate[f.slope]*SITE.soilMult[f.soil]);
+  const sitePrep=SITE.demo[f.demo]+(inside?0:f.fdn==="existing"?SITE.prepExisting:SITE.access[f.access]+SITE.slopeGrade[f.slope]+(f.crane?SITE.crane:0));
+  const utilTrench=inside?0:r100(f.trenchFt*SITE.trenchPerFt*(rock?SITE.rockTrench:1)+(f.sewerPump?SITE.pump:0)+(f.gasLine?f.trenchFt*SITE.gasPerFt:0));
+  const electrical=SITE.panel[f.panel]+(f.allElectric?SITE.allElectric:0)+(f.panel==="small"&&f.allElectric?SITE.smallAllElectric:0);
+  const soilNeeded=isNew&&(f.soil!=="known"||f.slope==="moderate"||f.slope==="steep");
+  const surveys=(f.boundary==="needed"?SITE.boundary:0)+(soilNeeded?(f.slope==="steep"?SITE.geotech:SITE.soilReport):0);
+  const parts=a=>a.filter(Boolean).join(", ");
+  const why={
+    foundation:inside?"Inside the existing house — no foundation work":f.fdn==="existing"?"Existing slab: new footings and moisture work":
+      sqft+" sq ft "+{flat:"slab on flat ground",gentle:"slab with stepped footings",moderate:"raised foundation for the slope",steep:"engineered hillside foundation"}[f.slope]+(f.soil==="clay"?", post-tensioned for expansive clay":rock?", with rock excavation":""),
+    sitePrep:parts([inside?"":f.fdn==="existing"?"Clean-out and prep of the existing structure":{open:"Open equipment access",side:"Side-yard access",tight:"Tight, hand-carry access"}[f.access],
+      isNew&&f.slope!=="flat"&&f.slope+" slope grading",isNew&&f.crane&&"crane set",{none:"",small:"shed or patio removal",structure:"demolishing an existing building"}[f.demo]])||"No site work",
+    utilTrench:inside?"Uses the house's existing utilities":parts([f.trenchFt+" ft shared trench for water, sewer and electric"+(rock?" through rock":""),f.sewerPump&&"sewer ejector pump",f.gasLine&&"gas line"]),
+    electrical:{room:"Subpanel off a 200A panel with space",full:"200A panel is full — load management or rebalancing",small:"100–150A service upgraded to 200A"}[f.panel]+(f.allElectric?", sized for all-electric":""),
+    surveys:parts([f.boundary==="needed"&&"Boundary survey",soilNeeded&&(f.slope==="steep"?"full geotechnical report":"soil report")])||"No survey or soil report needed",
+  };
+  return{foundation,sitePrep,utilTrench,electrical,surveys,why};
+}
+const siteDollars=x=>Object.fromEntries(SITE_KEYS.map(k=>[k,x[k]]));
+
 // Project-type templates: typical 2025–2026 values for each kind of ADU. Choosing one fills in
-// size, every cost line, GC margin and build time; any line can then be adjusted.
-//  - Prefab: factory pricing per sq ft, crane set in grading/access, pre-approved plans, the
+// size, $/sq ft, fees, GC margin, build time and site facts; site-work dollars follow from the facts.
+//  - Detached: stick-built, so $/sq ft sits on the "Stick-built" tick.
+//  - Prefab: factory pricing per sq ft, open access plus a crane set, pre-approved plans, the
 //    manufacturer's smaller margin, ~4 months on site.
-//  - Garage conversion: existing slab/walls/roof (footing and moisture work only), short utility
-//    runs, and no separate utility connection fee (California bars them for conversions of
-//    existing space); hidden conditions in older garages justify a higher contingency.
+//  - Garage conversion: existing slab/walls/roof, short utility runs, and no separate utility
+//    connection fee (California bars them for conversions of existing space); hidden conditions
+//    in older garages justify a higher contingency.
 //  - Attached: structural tie-in and matching roof/siding raise $/sq ft and design; shorter
-//    utility runs.
+//    utility runs and some demolition where it joins the house.
 //  - Junior ADU: interior remodel within the house (California caps JADUs at 500 sq ft), no
 //    site work, no utility connection fee.
+const F0={fdn:"new",slope:"flat",soil:"unknown",access:"side",crane:false,demo:"none",trenchFt:80,sewerPump:false,gasLine:false,panel:"room",allElectric:true,boundary:"needed"};
+const mkType=(label,noun,desc,f,v)=>({label,noun,desc,f,v:{...v,...siteDollars(siteFromFacts(f,v.sqft))}});
 const PTYPES={
-  detached:{label:"Detached new build",noun:"detached ADU",desc:"Stick-built backyard unit",v:{sqft:600,cpsf:250,foundation:10000,sitePrep:8000,utilTrench:8000,electrical:3000,hardscape:2000,permits:10000,hookup:8000,design:8000,surveys:3500,contingency:5,markup:20,buildMonths:6}},
-  prefab:{label:"Prefab / modular",noun:"prefab ADU",desc:"Factory-built, crane-set on site",v:{sqft:600,cpsf:220,foundation:8000,sitePrep:9000,utilTrench:8000,electrical:3000,hardscape:2000,permits:9000,hookup:8000,design:3000,surveys:3500,contingency:5,markup:10,buildMonths:4}},
-  garage:{label:"Garage conversion",noun:"garage conversion",desc:"Existing slab, walls and roof",v:{sqft:400,cpsf:175,foundation:3000,sitePrep:1000,utilTrench:3000,electrical:2000,hardscape:1000,permits:6000,hookup:0,design:5000,surveys:0,contingency:10,markup:20,buildMonths:4}},
-  attached:{label:"Attached addition",noun:"attached ADU",desc:"New unit joined to the house",v:{sqft:600,cpsf:275,foundation:10000,sitePrep:5000,utilTrench:4000,electrical:3000,hardscape:1000,permits:10000,hookup:6000,design:9000,surveys:3500,contingency:8,markup:20,buildMonths:7}},
-  jadu:{label:"Junior ADU",noun:"junior ADU",desc:"Within the house, up to 500 sq ft",v:{sqft:400,cpsf:125,foundation:0,sitePrep:0,utilTrench:0,electrical:1500,hardscape:0,permits:4000,hookup:0,design:3000,surveys:0,contingency:10,markup:20,buildMonths:3}},
+  detached:mkType("Detached new build","detached ADU","Stick-built backyard unit",F0,{sqft:600,cpsf:300,hardscape:2000,permits:10000,hookup:8000,design:8000,contingency:5,markup:20,buildMonths:6}),
+  prefab:mkType("Prefab / modular","prefab ADU","Factory-built, crane-set on site",{...F0,access:"open",crane:true},{sqft:600,cpsf:220,hardscape:2000,permits:9000,hookup:8000,design:3000,contingency:5,markup:10,buildMonths:4}),
+  garage:mkType("Garage conversion","garage conversion","Existing slab, walls and roof",{...F0,fdn:"existing",soil:"known",access:"open",trenchFt:30,allElectric:false,boundary:"have"},{sqft:400,cpsf:175,hardscape:1000,permits:6000,hookup:0,design:5000,contingency:10,markup:20,buildMonths:4}),
+  attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
+  jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",sqft:600,cpsf:250,permits:10000,hookup:8000,foundation:10000,sitePrep:8000,utilTrench:8000,electrical:3000,hardscape:2000,design:8000,surveys:3500,contingency:5,markup:20,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,buildMonths:6,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal"};
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -142,9 +190,9 @@ function shareUrlFor(state){
 }
 // Valid ranges for numeric fields. Anything loaded from a URL or storage — or typed into a
 // value — is clamped to these. Cost lines go well past their sliders so a real quote always fits.
-const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],incomeTax:[0,50],customRent:[0,100000]};
-const INT_KEYS=new Set(["term","strMonths","buildMonths","horizon"]);
-const ENUMS={projectType:Object.keys(PTYPES),rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
+const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],incomeTax:[0,50],customRent:[0,100000]};
+const INT_KEYS=new Set(["trenchFt","term","strMonths","buildMonths","horizon"]);
+const ENUMS={projectType:Object.keys(PTYPES),siteMode:["facts","dollars"],fdn:["new","existing","none"],slope:["flat","gentle","moderate","steep"],soil:["known","unknown","clay","rock"],access:["open","side","tight"],demo:["none","small","structure"],panel:["room","full","small"],boundary:["needed","have"],rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
 function cleanField(k,raw){
   const d=DEF[k];
   if(typeof d==="boolean")return raw===true||raw==="1"||raw==="true";
@@ -207,6 +255,42 @@ function TS({label,value,onChange,min,max,step,format,ticks,badge,typeMin,typeMa
   const align=left<8?"flex-start":left>92?"flex-end":"center";
   const on=i===near&&best<6;
   return(<div key={i} style={{position:"absolute",left:`${left}%`,transform:edge,display:"flex",flexDirection:"column",alignItems:align,pointerEvents:"none"}}><div style={{width:1,height:stagger?16:5,background:t.color||"#3d444d",alignSelf:align==="center"?"center":align,opacity:on?1:0.65}}/><span style={{fontSize:9.5,color:on?"#e6edf3":tk,whiteSpace:"nowrap",marginTop:1,fontWeight:on?600:500,transition:"color 0.15s"}}>{t.label}</span></div>)})})()}</div>)}</div>)}
+
+// One site fact: a label (with optional help) above a row of choices.
+function Fact({label,help,children}){
+  return(<div><div style={{fontSize:12,color:"#8b949e",marginBottom:5,display:"flex",alignItems:"center"}}>{label}{help&&<IT align="left" text={help}/>}</div>{children}</div>);
+}
+const opts=pairs=>pairs.map(([value,label])=>({value,label}));
+// The site-facts questionnaire and the dollar amounts it produces, each with the reason.
+function SiteFacts({s,set,sf}){
+  const isNew=s.fdn==="new",inside=s.fdn==="none";
+  return(<div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+    <Fact label="Foundation"><ModePills label="Foundation" value={s.fdn} onChange={set("fdn")} options={opts([["new","New"],["existing","Existing slab"],["none","None (inside house)"]])}/></Fact>
+    {isNew&&<Fact label="Lot slope" help={"Gentle: under about 5%. Moderate: 5–15% — usually a raised foundation. Steep: over 15% — an engineered hillside foundation and a full geotechnical report."}>
+      <ModePills label="Lot slope" value={s.slope} onChange={set("slope")} options={opts([["flat","Flat"],["gentle","Gentle"],["moderate","Moderate"],["steep","Steep"]])}/></Fact>}
+    {isNew&&<Fact label="Soil" help={"Known stable: a recent soil report or well-documented neighborhood — no new report needed. Unknown: budget a soil report. Expansive clay swells when wet and needs a post-tensioned slab. Rock slows excavation and trenching."}>
+      <ModePills label="Soil" value={s.soil} onChange={set("soil")} options={opts([["known","Known stable"],["unknown","Unknown"],["clay","Expansive clay"],["rock","Rock"]])}/></Fact>}
+    {isNew&&<Fact label="Equipment access" help={"Open: a driveway or alley a small excavator and concrete truck can use. Side yard: a narrow path, smaller equipment and pumped concrete. Tight: materials carried in by hand."}>
+      <ModePills label="Equipment access" value={s.access} onChange={set("access")} options={opts([["open","Open"],["side","Side yard"],["tight","Tight"]])}/></Fact>}
+    {isNew&&<Tog on={s.crane} onToggle={()=>set("crane")(!s.crane)} label="Crane set" sub="Prefab and modular units are lifted into place — about $6,000"/>}
+    {!inside&&<Fact label="Demolition"><ModePills label="Demolition" value={s.demo} onChange={set("demo")} options={opts([["none","None"],["small","Shed or patio"],["structure","Existing building"]])}/></Fact>}
+    {!inside&&<TS label={<>Distance to utility connections<IT align="left" text={"How far the trench runs from the house's water, sewer and electrical connections to the ADU. One shared trench is typical, at roughly $100 per foot."}/></>} value={s.trenchFt} onChange={set("trenchFt")} typeMin={0} typeMax={1000} min={0} max={300} step={10} format={v=>v+" ft"} ticks={[{value:30,label:"Close",color:gn},{value:80,label:"Typical",color:tb},{value:150,label:"Far",color:yl},{value:250,label:"Very far",color:rd}]}/>}
+    {!inside&&<Fact label="Sewer" help={"If the ADU sits lower than the sewer connection, waste has to be pumped up with an ejector pump — about $8,000 installed."}>
+      <ModePills label="Sewer" value={s.sewerPump?"pump":"gravity"} onChange={v=>set("sewerPump")(v==="pump")} options={opts([["gravity","Flows by gravity"],["pump","Needs a pump"]])}/></Fact>}
+    {!inside&&<Tog on={s.gasLine} onToggle={()=>set("gasLine")(!s.gasLine)} label="Gas line to the ADU" sub="Adds about $20 per foot to the trench"/>}
+    <Fact label="Existing electrical panel" help={"The house's main panel. With spare capacity the ADU gets a subpanel; a full 200A panel needs load management; 100–150A service usually has to be upgraded to 200A."}>
+      <ModePills label="Existing electrical panel" value={s.panel} onChange={set("panel")} options={opts([["room","200A, has space"],["full","200A, full"],["small","100–150A"]])}/></Fact>
+    <Tog on={s.allElectric} onToggle={()=>set("allElectric")(!s.allElectric)} label="All-electric ADU" sub="Heat pump and induction cooking need more panel capacity"/>
+    <Fact label="Boundary survey"><ModePills label="Boundary survey" value={s.boundary} onChange={set("boundary")} options={opts([["needed","Needed"],["have","Have a recent one"]])}/></Fact>
+    <div style={{border:"1px solid #21262d",borderRadius:8,padding:"6px 12px",background:"#0d1117"}}>
+      {[["Foundation","foundation"],["Grading, demo & access","sitePrep"],["Utility trenching","utilTrench"],["Electrical","electrical"],["Surveys & reports","surveys"]].map(([l,k],i)=>(
+        <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"7px 0",borderTop:i?"1px solid #21262d":"none"}}>
+          <div style={{minWidth:0}}><div style={{fontSize:12.5,color:"#c9d1d9"}}>{l}{k==="surveys"&&<span style={{fontSize:11,color:"#6e7681"}}> (counted in soft costs)</span>}</div><div style={{fontSize:11,color:"#8b949e",lineHeight:1.4}}>{sf.why[k]}</div></div>
+          <div style={{fontFamily:"'Fraunces',serif",fontSize:15,fontWeight:600,color:"#e6edf3",whiteSpace:"nowrap"}}>{sf[k]===0?"$0":fD(sf[k])}</div>
+        </div>))}
+    </div>
+  </div>);
+}
 
 // "What are you building?" — applies a PTYPES template. Shows when the lines have been edited
 // away from the template, with a link to restore it.
@@ -992,11 +1076,17 @@ function App(){
     else window.prompt("Copy this link:",url);
   },[state]);
   const set=useCallback(k=>v=>{if(k!=="view")fromShareRef.current=false;setState(s=>({...s,[k]:v}))},[]);
-  const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,projectType:t}))},[]);
-  const{projectType,sqft,cpsf,permits,hookup,foundation,sitePrep,utilTrench,electrical,hardscape,design,surveys,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,customRent,customName,view}=state;
+  const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,...PTYPES[t].f,projectType:t}))},[]);
+  // Switching to dollar amounts starts the sliders at what the site facts produced, so nothing jumps.
+  const setSiteMode=useCallback(m=>{fromShareRef.current=false;setState(s=>m==="dollars"&&s.siteMode!=="dollars"?{...s,siteMode:m,...siteDollars(siteFromFacts(s,s.sqft))}:{...s,siteMode:m})},[]);
+  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const ptype=PTYPES[projectType]||PTYPES.detached;
-  const typeCustom=Object.entries(ptype.v).some(([k,v])=>state[k]!==v);
+  // Site work: from the site facts, or the dollar sliders when the user prefers to enter amounts.
+  const facts=siteMode!=="dollars";
+  const sf=siteFromFacts(state,sqft);
+  const{foundation,sitePrep,utilTrench,electrical,surveys}=facts?sf:state;
+  const typeCustom=Object.entries(ptype.v).some(([k,v])=>!(facts&&SITE_KEYS.includes(k))&&state[k]!==v)||(facts&&FACT_KEYS.some(k=>state[k]!==ptype.f[k]));
   const hasSTR=isSTR||isHybrid;
   const buildCost=sqft*cpsf,siteCost=foundation+sitePrep+utilTrench+electrical+hardscape;
   const contingencyAmt=Math.round((buildCost+siteCost)*(contingency/100));
@@ -1080,7 +1170,7 @@ function App(){
 
   // Consumer-view metrics — all read from the same simulation.
   const cm=useMemo(()=>{
-    const ptsYears=Math.ceil(evalK/12)+(isCash?0:3);
+    const ptsYears=Math.max(Math.ceil(evalK/12)+(isCash?0:3),M0.po!==Infinity&&M0.po<=30?Math.ceil(M0.po)+1:0);
     const pt=(s,year,extra)=>({year,cash:s.cash,value:s.value,bal:s.bal,loanNeg:-s.bal,tot:s.tot,...extra});
     let pts=[];for(let y=0;y<=ptsYears;y++)pts.push(pt(M0.at(y*12),y));
     if(buildMonths>0){
@@ -1165,6 +1255,7 @@ function App(){
         ["Value multiplier","110× monthly long-term rent"],
       ],
       notes:[
+        ...(facts?(()=>{const lc=t=>t[0].toLowerCase()+t.slice(1);return["Site work is estimated from site facts — foundation: "+lc(sf.why.foundation)+"; grading and access: "+lc(sf.why.sitePrep)+"; utilities: "+lc(sf.why.utilTrench)+"; electrical: "+lc(sf.why.electrical)+"; surveys: "+lc(sf.why.surveys)+"."]})():[]),
         "Rent is the figure entered. The ADU's value is estimated at 110× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
         "The model runs month by month from project start."+(buildMonths>0?" During the "+buildMonths+"-month build there is no rent; funds are drawn on a standard construction schedule (soft costs up front, owner cash first, hard costs on an S-curve with 5% retention)"+(loanAmt>0?(conIntMode==="none"?". Construction interest is not charged in this scenario.":", with interest on the drawn balance."):"."):""),
         "Operating costs are vacancy, maintenance, management"+(hasSTR?", hosting":"")+", property tax and insurance, each escalating at the rates shown.",
@@ -1215,11 +1306,14 @@ function App(){
           </div>
 
           <SL>Site work</SL>
+          <ModePills label="Site work method" value={siteMode} onChange={setSiteMode} options={[{value:"facts",label:"Estimate from site facts"},{value:"dollars",label:"Enter dollar amounts"}]}/>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <TS label={<>Foundation<IT align="left" text="What the structure sits on. Cheapest to priciest: pier/post (posts driven into the ground — common for smaller or elevated units), slab (a poured concrete pad — the typical default), crawl space (a raised foundation with access underneath, needed on uneven lots), and hillside engineering (retaining walls and extra structural work for a sloped site)."/></>} value={foundation} onChange={set("foundation")} typeMin={LIM.foundation[0]} typeMax={LIM.foundation[1]} min={0} max={50000} step={1000} format={v=>v===0?"Existing":fD(v)} ticks={[{value:0,label:"Existing",color:gn},{value:5000,label:"Pier / post",color:gn},{value:10000,label:"Slab",color:tb},{value:18000,label:"Crawl space",color:tk},{value:35000,label:"Hillside eng.",color:rd}]}/>
-            <TS label="Grading, demo & access" value={sitePrep} onChange={set("sitePrep")} typeMin={LIM.sitePrep[0]} typeMax={LIM.sitePrep[1]} min={0} max={30000} step={500} format={v=>v===0?"None":fD(v)} ticks={[{value:3000,label:"Flat / clear",color:gn},{value:8000,label:"Average",color:tk},{value:15000,label:"Tight access",color:yl},{value:25000,label:"Complex",color:rd}]}/>
-            <TS label="Utility trenching" value={utilTrench} onChange={set("utilTrench")} typeMin={LIM.utilTrench[0]} typeMax={LIM.utilTrench[1]} min={0} max={30000} step={500} format={v=>v===0?"None (existing)":fD(v)} ticks={[{value:3000,label:"Short run",color:gn},{value:8000,label:"Average",color:tk},{value:15000,label:"Long / rocky",color:yl},{value:22000,label:"+sewer pump",color:rd}]}/>
-            <TS label="Electrical panel upgrade" value={electrical} onChange={set("electrical")} typeMin={LIM.electrical[0]} typeMax={LIM.electrical[1]} min={0} max={8000} step={500} format={v=>v===0?"Not needed":fD(v)} ticks={[{value:0,label:"Not needed",color:gn},{value:2000,label:"Subpanel",color:tb},{value:5000,label:"200A upgrade",color:tk},{value:7000,label:"Complex",color:yl}]}/>
+            {facts?<SiteFacts s={state} set={set} sf={sf}/>:(<div style={{display:"flex",flexDirection:"column",gap:6,marginTop:10}}>
+              <TS label={<>Foundation<IT align="left" text="What the structure sits on. Cheapest to priciest: pier/post (posts driven into the ground — common for smaller or elevated units), slab (a poured concrete pad — the typical default), crawl space (a raised foundation with access underneath, needed on uneven lots), and hillside engineering (retaining walls and extra structural work for a sloped site)."/></>} value={foundation} onChange={set("foundation")} typeMin={LIM.foundation[0]} typeMax={LIM.foundation[1]} min={0} max={50000} step={1000} format={v=>v===0?"Existing":fD(v)} ticks={[{value:0,label:"Existing",color:gn},{value:5000,label:"Pier / post",color:gn},{value:10000,label:"Slab",color:tb},{value:18000,label:"Crawl space",color:tk},{value:35000,label:"Hillside eng.",color:rd}]}/>
+              <TS label="Grading, demo & access" value={sitePrep} onChange={set("sitePrep")} typeMin={LIM.sitePrep[0]} typeMax={LIM.sitePrep[1]} min={0} max={30000} step={500} format={v=>v===0?"None":fD(v)} ticks={[{value:3000,label:"Flat / clear",color:gn},{value:8000,label:"Average",color:tk},{value:15000,label:"Tight access",color:yl},{value:25000,label:"Complex",color:rd}]}/>
+              <TS label="Utility trenching" value={utilTrench} onChange={set("utilTrench")} typeMin={LIM.utilTrench[0]} typeMax={LIM.utilTrench[1]} min={0} max={30000} step={500} format={v=>v===0?"None (existing)":fD(v)} ticks={[{value:3000,label:"Short run",color:gn},{value:8000,label:"Average",color:tk},{value:15000,label:"Long / rocky",color:yl},{value:22000,label:"+sewer pump",color:rd}]}/>
+              <TS label="Electrical panel upgrade" value={electrical} onChange={set("electrical")} typeMin={LIM.electrical[0]} typeMax={LIM.electrical[1]} min={0} max={8000} step={500} format={v=>v===0?"Not needed":fD(v)} ticks={[{value:0,label:"Not needed",color:gn},{value:2000,label:"Subpanel",color:tb},{value:5000,label:"200A upgrade",color:tk},{value:7000,label:"Complex",color:yl}]}/>
+            </div>)}
             <TS label="Hardscape & path" value={hardscape} onChange={set("hardscape")} typeMin={LIM.hardscape[0]} typeMax={LIM.hardscape[1]} min={0} max={10000} step={500} format={v=>v===0?"None":fD(v)} ticks={[{value:0,label:"None",color:gn},{value:1500,label:"Short path",color:tk},{value:4000,label:"Path + patio",color:tb},{value:8000,label:"Full hardscape",color:yl}]}/>
             <Sub label="Site subtotal" value={siteCost}/>
           </div>
@@ -1229,7 +1323,7 @@ function App(){
             <TS label={<>Permits, plan check & inspections<IT align="left" text={"Includes plan review and all construction inspections (foundation, framing, rough MEP, insulation, final/CO).\n\nRe-inspection fees if something fails are typically $100–$500 and come out of the builder's margin."}/></>} value={permits} onChange={set("permits")} typeMin={LIM.permits[0]} typeMax={LIM.permits[1]} min={0} max={30000} step={500} format={fD} ticks={[{value:3000,label:"Small / waived",color:gn},{value:7000,label:"Sacramento",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:rd}]}/>
             <TS label="Water & sewer fees" value={hookup} onChange={set("hookup")} typeMin={LIM.hookup[0]} typeMax={LIM.hookup[1]} min={0} max={60000} step={1000} format={fD} ticks={[{value:0,label:"Waived / incl.",color:gn},{value:4000,label:"San Diego",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:yl},{value:30000,label:"+lateral",color:rd}]}/>
             <TS label="Design & engineering" value={design} onChange={set("design")} typeMin={LIM.design[0]} typeMax={LIM.design[1]} min={0} max={25000} step={500} format={fD} ticks={[{value:3000,label:"Pre-approved",color:gn},{value:10000,label:"Custom arch.",color:tk},{value:18000,label:"Bay Area",color:tk}]}/>
-            <TS label={<>Surveys & reports<IT align="left" text="A land survey confirms your property lines and where the ADU can legally sit. A soil report (geotechnical study) tells the engineer what kind of foundation the ground actually needs — required on many hillside or unstable-soil lots, skippable on a flat, already-documented one."/></>} value={surveys} onChange={set("surveys")} typeMin={LIM.surveys[0]} typeMax={LIM.surveys[1]} min={0} max={12000} step={500} format={v=>v===0?"Not required":fD(v)} ticks={[{value:0,label:"Not req'd",color:gn},{value:1500,label:"Survey only",color:tk},{value:3500,label:"Survey + soil",color:tb},{value:7000,label:"Full geotech",color:yl}]}/>
+            {facts?(<div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"baseline"}}><div><div style={{fontSize:12,color:"#8b949e"}}>Surveys & reports</div><div style={{fontSize:11,color:"#6e7681"}}>From site facts: {sf.why.surveys}</div></div><span style={{fontSize:15,fontFamily:"'Fraunces',serif",fontWeight:600,color:"#e6edf3"}}>{surveys===0?"Not required":fD(surveys)}</span></div>):<TS label={<>Surveys & reports<IT align="left" text="A land survey confirms your property lines and where the ADU can legally sit. A soil report (geotechnical study) tells the engineer what kind of foundation the ground actually needs — required on many hillside or unstable-soil lots, skippable on a flat, already-documented one."/></>} value={surveys} onChange={set("surveys")} typeMin={LIM.surveys[0]} typeMax={LIM.surveys[1]} min={0} max={12000} step={500} format={v=>v===0?"Not required":fD(v)} ticks={[{value:0,label:"Not req'd",color:gn},{value:1500,label:"Survey only",color:tk},{value:3500,label:"Survey + soil",color:tb},{value:7000,label:"Full geotech",color:yl}]}/>}
             <TS label={<>Furnishing<IT align="left" text={(hasSTR?"Furniture, linens, kitchenware, decor — everything a guest needs. The range, dishwasher, and refrigerator are already in structure $/sqft.":"Washer/dryer, furniture, or other extras beyond what the builder installs. The range, dishwasher, and refrigerator are already in structure $/sqft. Set to $0 if tenant-supplied.")+"\n\nFurnishings are not depreciated with the building in this model. Expect to replace them every 5–7 years ("+(hasSTR?"sooner with heavy guest turnover":"sooner with hard use")+") — budget for that from the maintenance reserve."}/></>} value={furnishing} onChange={set("furnishing")} typeMin={LIM.furnishing[0]} typeMax={LIM.furnishing[1]} min={0} max={25000} step={1000} format={v=>v===0?"Unfurnished":fD(v)} ticks={hasSTR?[{value:0,label:"Unfurnished",color:gn},{value:5000,label:"Basic",color:tk},{value:10000,label:"Standard",color:tb},{value:18000,label:"Design-forward",color:yl}]:[{value:0,label:"Unfurnished",color:gn},{value:1500,label:"Washer/dryer",color:tk},{value:5000,label:"Partial",color:tb},{value:12000,label:"Fully furnished",color:yl}]}/>
             <Sub label="Soft cost subtotal" value={softCostBase}/>
           </div>
