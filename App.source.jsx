@@ -916,7 +916,7 @@ const fieldLabel={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpa
 const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color:LT.text,whiteSpace:"nowrap"};
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
-function ConsumerView({cm,costRange,preparedFor,preparedBy,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedBy,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);const[showParts,setShowParts]=useState(false);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -992,12 +992,23 @@ function ConsumerView({cm,costRange,preparedFor,preparedBy,cmpCols,verdict,saleO
           </>)}
         </div>
       </div>
-      {origFeeAmt>0&&(
-        <div style={{marginTop:16,padding:"10px 14px",borderRadius:8,background:LT.warnBg,fontSize:12.5,color:LT.text,lineHeight:1.5,display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-          <span><strong>Loan origination fee:</strong> {fD(origFeeAmt)} ({origFee}% of the {fD(assetCost)} build cost), added to the project price and financed.</span>
-          <span style={{fontFamily:"'Fraunces',serif",fontWeight:600,whiteSpace:"nowrap"}}>{fD(assetCost)} + {fD(origFeeAmt)} = {fD(total)}</span>
-        </div>
-      )}
+      {/* Loan origination / dealer fee — the same setting as the Full model's switch */}
+      <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid "+LT.borderLight}}>
+        <button type="button" role="switch" aria-checked={origFeeOn} onClick={()=>setOrigFeeOn(!origFeeOn)} className="no-print"
+          style={{display:"flex",alignItems:"center",gap:12,background:"none",border:"none",padding:0,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
+          <span style={{width:38,height:22,borderRadius:11,padding:2,background:origFeeOn?LT.info:"#cbd5e1",transition:"background 0.2s",flexShrink:0,boxSizing:"border-box"}}>
+            <span style={{display:"block",width:18,height:18,borderRadius:9,background:"#fff",transform:origFeeOn?"translateX(16px)":"translateX(0)",transition:"transform 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.25)"}}/>
+          </span>
+          <span><span style={{display:"block",fontSize:13,fontWeight:600,color:LT.text}}>Loan origination / dealer fee</span>
+            <span style={{display:"block",fontSize:11.5,color:LT.muted}}>{origFeeOn?origFee+"% of the build cost, added to the price and financed — the rate is set in the Full model":"Off — no fee added to the project price"}</span></span>
+        </button>
+        {origFeeAmt>0&&(
+          <div style={{marginTop:10,padding:"10px 14px",borderRadius:8,background:LT.warnBg,fontSize:12.5,color:LT.text,lineHeight:1.5,display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <span><strong>Loan origination fee:</strong> {fD(origFeeAmt)} ({origFee}% of the {fD(assetCost)} build cost), added to the project price and financed.</span>
+            <span style={{fontFamily:"'Fraunces',serif",fontWeight:600,whiteSpace:"nowrap"}}>{fD(assetCost)} + {fD(origFeeAmt)} = {fD(total)}</span>
+          </div>
+        )}
+      </div>
     </div>
 
     {!hasCustom&&!isSTR&&(
@@ -1902,7 +1913,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} costRange={costRange} preparedFor={preparedFor} preparedBy={preparedBy} cmpCols={mdl.cmp} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} origFeeOn={origFeeOn} setOrigFeeOn={set("origFeeOn")} costRange={costRange} preparedFor={preparedFor} preparedBy={preparedBy} cmpCols={mdl.cmp} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>

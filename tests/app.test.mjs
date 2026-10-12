@@ -714,8 +714,19 @@ describe("loan origination fee in the Summary", () => {
     assert.match(t, /\$299,150 to build \+ \$14,958 loan fee = \$314,108 project/);
     assert.match(t, /Loan origination fee: \$14,958 \(5% of the \$299,150 build cost\), added to the project price and financed\./);
   });
-  test("is absent when there's no fee", async () => {
-    assert.doesNotMatch((await load("?customRent=2600&view=consumer")).text(), /loan fee|origination fee/i);
+  test("can be switched on and off from the Summary", async () => {
+    const p = await load("?customRent=2600&view=consumer");
+    const sw = () => [...p.doc.querySelectorAll(".screen-only button[role=switch]")].find(b => b.textContent.includes("Loan origination / dealer fee"));
+    assert.equal(sw().getAttribute("aria-checked"), "false");
+    sw().click(); await wait(60);
+    assert.equal(p.saved().origFeeOn, true);
+    assert.match(p.text(), /\$299,150 to build \+ \$14,958 loan fee = \$314,108 project/);
+    sw().click(); await wait(60);
+    assert.equal(p.saved().origFeeOn, false);
+    assert.doesNotMatch(p.text(), /loan fee =/);
+  });
+  test("no fee line or loan-fee total when it's off", async () => {
+    assert.doesNotMatch((await load("?customRent=2600&view=consumer")).text(), /loan fee =|Loan origination fee:/);
   });
 });
 
