@@ -335,7 +335,7 @@ describe("site facts", () => {
     assert.equal(p.saved().foundation, 43500);
     assert.equal(p.saved().siteMode, "dollars");
     assert.equal(p.text().match(/Total est\.(\$[\d,]+)/)[1], before);
-    assert.match(p.text(), /Foundation\?\$43,500/);
+    assert.equal(p.doc.querySelector("input[aria-label='Foundation in dollars']").value, "43,500");
   });
   test("each template's facts produce its site costs, and editing a fact marks it customized", async () => {
     const p = await load("?customRent=2000");
@@ -393,6 +393,43 @@ describe("budget confidence", () => {
   });
 });
 
+describe("dollar amounts mode", () => {
+  const box = (p, label) => [...p.doc.querySelectorAll("input[aria-label]")].find(i => i.getAttribute("aria-label") === label + " in dollars") ?? null;
+  const enter = async (p, label, text, key) => {
+    const el = box(p, label);
+    el.focus(); el.dispatchEvent(new p.w.FocusEvent("focusin", { bubbles: true })); await wait(20);
+    Object.getOwnPropertyDescriptor(p.w.HTMLInputElement.prototype, "value").set.call(el, text);
+    el.dispatchEvent(new p.w.Event("input", { bubbles: true }));
+    if (key) el.dispatchEvent(new p.w.KeyboardEvent("keydown", { key, bubbles: true }));
+    el.blur(); el.dispatchEvent(new p.w.FocusEvent("focusout", { bubbles: true }));
+    await wait(60);
+  };
+  test("every site line has a visible dollar box", async () => {
+    const p = await load("?customRent=2600&siteMode=dollars");
+    for (const l of ["Foundation", "Grading, demo & access", "Utility trenching", "Electrical panel upgrade", "Hardscape & path", "Surveys & reports"])
+      assert.ok(box(p, l), l);
+    assert.equal(box(p, "Foundation").value, "10,000");
+    assert.equal(box(await load("?customRent=2600"), "Foundation"), null, "facts mode has no foundation box");
+  });
+  test("typing a quote into a box sets it, with $ , and k shorthand", async () => {
+    const p = await load("?customRent=2600&siteMode=dollars");
+    await enter(p, "Foundation", "$11,240");
+    assert.equal(p.saved().foundation, 11240);
+    assert.equal(box(p, "Foundation").value, "11,240");
+    await enter(p, "Utility trenching", "14.5k");
+    assert.equal(p.saved().utilTrench, 14500);
+    await enter(p, "Grading, demo & access", "75000");
+    assert.equal(p.saved().sitePrep, 75000, "boxes go past the slider's range");
+  });
+  test("Escape and nonsense leave the value alone", async () => {
+    const p = await load("?customRent=2600&siteMode=dollars");
+    await enter(p, "Foundation", "99999", "Escape");
+    await enter(p, "Electrical panel upgrade", "lots");
+    assert.equal(box(p, "Foundation").value, "10,000");
+    assert.equal(box(p, "Electrical panel upgrade").value, "3,000");
+  });
+});
+
 describe("typed values", () => {
   const editor = (p, label) => {
     const lab = [...p.doc.querySelectorAll(".screen-only span[id]")].find(s => s.textContent.startsWith(label));
@@ -411,9 +448,9 @@ describe("typed values", () => {
     const p = await load("?customRent=2600&siteMode=dollars");
     await typeInto(p, "Permits", "$11,240");
     assert.equal(p.saved().permits, 11240);
-    await typeInto(p, "Foundation", "12.5k");
-    assert.equal(p.saved().foundation, 12500);
-    assert.match(p.text(), /Foundation\?\$12,500/);
+    await typeInto(p, "Design & engineering", "12.5k");
+    assert.equal(p.saved().design, 12500);
+    assert.match(p.text(), /Design & engineering\$12,500/);
   });
   test("typed values can exceed the slider's range, within the field's limits", async () => {
     const p = await load("?customRent=2600");
