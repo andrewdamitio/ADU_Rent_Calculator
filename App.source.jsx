@@ -14,24 +14,56 @@ const rs=s=>Math.pow(s/600,0.55),ut=s=>s<450?"Studio":s<700?"1 Bed":s<950?"1–2
 const cMP=(p,r,y)=>{if(p<=0)return 0;const mr=r/12,n=y*12;if(mr===0)return p/n;return p*(mr*Math.pow(1+mr,n))/(Math.pow(1+mr,n)-1)};
 
 // The one monthly simulation every number on the page reads from.
-// Time counts in months from project start. The first buildMo months are construction:
-// no rent and no loan payments (no interest is charged during the build). Rent and loan
-// payments both start at month buildMo.
+// Time counts in months from project start. The first buildMo months are construction;
+// rent and amortizing loan payments both start at month buildMo.
+//
+// Construction draws follow standard construction-lending practice:
+//  - soft costs (design, permits, utility fees, surveys, loan fee) are paid at the start,
+//  - the owner's cash goes in first (lenders require equity before they fund),
+//  - hard costs are funded monthly in arrears as work is inspected, along an S-curve
+//    (slow mobilization, fast framing/rough-in, slow finish work),
+//  - 5% retention is held back until completion (California caps private-works
+//    retention at 5%), and furnishings are bought at completion.
+// Interest accrues only on what has been drawn. It's either paid monthly (HELOCs and
+// most construction-to-permanent loans), capitalized into the loan at conversion, or
+// not charged. Either way it's a cost of producing the building, so for tax purposes it
+// is capitalized into the depreciation basis (IRC §263A) rather than deducted.
 const SIM_YEARS=50,DEP_MONTHS=330; // 27.5-year residential depreciation
+const RETENTION=0.05;
 function runModel(p){
-  const{loanAmt,cashDown,annRate,termYr,buildMo,grossY1,collectPct,opPct,mPTY1,mInsY1,rentGrowth,taxGrowthA,insGrowthA,taxMarg,depBasis,valueY1,valueGrowth}=p;
-  const bm=buildMo||0,n=termYr*12,mr=annRate/12,pmt=cMP(loanAmt,annRate,termYr);
+  const{loanAmt,cashDown,annRate,termYr,buildMo,grossY1,collectPct,opPct,mPTY1,mInsY1,rentGrowth,taxGrowthA,insGrowthA,taxMarg,depBasis,valueY1,valueGrowth,
+    conMode="none",conRate=annRate,spendUp=0,spendEnd=0}=p;
+  const bm=buildMo||0,n=termYr*12,mr=annRate/12;
   const mg=x=>x>0?Math.pow(1+x,1/12)-1:0;
   const mrG=mg(rentGrowth),mtG=mg(taxGrowthA),miG=mg(insGrowthA),mvG=mg(valueGrowth);
-  const dep=depBasis>0?depBasis/27.5/12:0;
   const valueAt=k=>k<bm?0:valueY1*Math.pow(1+mvG,k-bm);
+
+  // Cumulative project spend after k months of construction.
+  const total=loanAmt+cashDown,hard=Math.max(0,total-spendUp-spendEnd);
+  const spentAt=k=>{if(k>=bm)return total;const f=k/bm;return spendUp+hard*(1-RETENTION)*f*f*(3-2*f)};
+  const conMr=loanAmt>0&&conMode!=="none"?conRate/12:0;
+  let equity=0,drawn=0,capInt=0,conPaid=0,conBalSum=0;
+  const spend=S=>{const e=Math.min(S,cashDown),d=Math.max(0,S-cashDown);const de=e-equity;equity=e;drawn=d;return de};
+
+  let cash=-spend(spentAt(0)),bal=drawn,pmt=0,dep=0,cfm=-1,subsidies=0;
   const months=[]; // one entry per rented month; months[0] is the first rent check
-  let bal=loanAmt,cash=-cashDown,cfm=-1,subsidies=0;
   const snap=[{k:0,cash,bal,value:valueAt(0),tot:valueAt(0)-bal+cash}]; // position after k months
   let payK=cash>=0?0:-1;
   for(let k=0;k<bm+SIM_YEARS*12;k++){
     const m=k-bm;
-    if(m>=0){
+    if(m<0){
+      // Construction month: interest-only on the balance drawn so far, then this month's draw.
+      const b=drawn+capInt,intr=b*conMr;
+      conBalSum+=drawn;
+      if(conMode==="cap")capInt+=intr;else{conPaid+=intr;cash-=intr}
+      cash-=spend(spentAt(k+1));
+      bal=drawn+capInt;
+    }else{
+      if(m===0){
+        // Conversion: the permanent loan is everything drawn plus any capitalized interest.
+        bal=drawn+capInt;pmt=cMP(bal,annRate,termYr);
+        dep=(depBasis+capInt+conPaid)/27.5/12;
+      }
       const rent=grossY1*Math.pow(1+mrG,m),coll=rent*collectPct,opex=coll*opPct;
       const pt=mPTY1*Math.pow(1+mtG,m),ins=mInsY1*Math.pow(1+miG,m);
       const noi=coll-opex-pt-ins;
@@ -59,10 +91,14 @@ function runModel(p){
     return{year:y,rent:a("rent"),opEx:a("vacOpex"),propTax:a("pt"),ins:a("ins"),incomeTax:a("tax"),pmt:a("pay"),interest:a("interest"),principal:a("principal"),net:a("flow")}};
   return{
     pmt,months,snap,at,year,subsidies,loanEnd:bm+n,
+    // Construction-period interest: total, the part paid out of pocket, the part added to the loan,
+    // and the average drawn balance it accrued on.
+    conInterest:conPaid+capInt,conPaid,conCap:capInt,conAvgDrawn:bm>0?conBalSum/bm:0,
     // CF+: years from project start until monthly after-tax cash flow is >= 0. 0 = from the first rent check.
     cfPlus:cfm<0?Infinity:cfm===0?0:(bm+cfm)/12,
     cfAtTerm:loanAmt>0&&cfm>=n,
-    // Payback: years from project start until every dollar you put in (down payment + monthly shortfalls) is back.
+    // Payback: years from project start until every dollar you put in (down payment, shortfalls,
+    // construction interest) is back.
     po:payK<0?Infinity:payK/12,
   };
 }
@@ -74,7 +110,7 @@ const fK=n=>{const a=Math.abs(n),s=n<0?"-":"+";return a>=1000?s+"$"+Math.round(a
 
 const CI={"Rent":"Year-1 monthly rent at the current ADU size, as entered.\n\nIf STR mode is on, revenue is the nightly rate × 30.4 nights (before unbooked nights).","Net":"First-month rent minus operating expenses (pre-tax).\n\nProperty tax, insurance, maintenance, vacancy, management.","Cov.":"First-month pre-tax net rent ÷ loan payment.\n\nIgnores equity, rent growth, and income tax.\n100% = breakeven monthly.","+/−":"First-month pre-tax net rent minus loan payment.\n\nDoes NOT reflect rent growth or taxes.\n\nGreen = passive income.\nRed = monthly subsidy.","CF+":"Years from project start until monthly cash flow turns positive: rent after expenses and income tax, minus the loan payment.\n\n'Now' = positive from the first rent check.\n* = only turned positive because the loan ended.\n\nAccounts for rent growth AND income tax (interest + depreciation deductions shrink over time).","Payback":"Years from project start until the ADU has paid back every dollar you put in: your down payment plus any months where you covered a shortfall.\n\nUses after-tax cash flow after loan payments, so financing costs count. 'Immediate' = $0 down and never out of pocket.\n\nGreen ≤ term. Yellow ≤ 1.5×.\nRed = longer.","Equity":"Rough estimate of value added on day one, using a GRM of 110× monthly rent.\n\nSimplified heuristic — real appraisers use sales comparables first, income approach as a cross-check. The right multiplier varies sharply: coastal CA and Seattle have GRMs of 200–300×, so this likely understates value there. Midwest markets are closer to 80–120×.\n\nAlways uses LTR rent, not STR income.\n\nGreen = gross estimate exceeds ADU cost.","Return":"Your net position when the loan is paid off: the ADU's estimated value at that point, plus cumulative after-tax cash flow, minus your down payment.\n\nThe first % is the compound annual return on TOTAL PROJECT COST from project start to loan payoff (construction included) — the denominator is the full cost whether you financed it or not.\n\nThe second is the same on the cash you actually put in. It is undefined at 0% down, where you invested nothing."};
 
-const DEF={sqft:600,cpsf:250,permits:10000,hookup:8000,foundation:10000,sitePrep:8000,utilTrench:8000,electrical:3000,hardscape:2000,design:8000,surveys:3500,contingency:5,markup:20,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,buildMonths:6,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal"};
+const DEF={sqft:600,cpsf:250,permits:10000,hookup:8000,foundation:10000,sitePrep:8000,utilTrench:8000,electrical:3000,hardscape:2000,design:8000,surveys:3500,contingency:5,markup:20,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,buildMonths:6,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -88,9 +124,9 @@ function shareUrlFor(state){
 }
 // Valid ranges for numeric fields (the slider bounds). Anything loaded from a URL or
 // from storage is clamped to these so a bad link can't produce NaN/Infinity.
-const LIM={sqft:[300,1200],cpsf:[100,500],permits:[0,30000],hookup:[0,60000],foundation:[3000,50000],sitePrep:[1000,30000],utilTrench:[2000,30000],electrical:[0,8000],hardscape:[0,10000],design:[0,25000],surveys:[0,12000],contingency:[0,20],markup:[0,40],strADR:[50,400],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,25000],cashDown:[0,100],origFee:[1,40],rate:[3,14],term:[5,20],buildMonths:[0,18],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],incomeTax:[0,50],customRent:[0,100000]};
-const INT_KEYS=new Set(["term","strMonths","buildMonths"]);
-const MODES=["ltr","hybrid","str"];
+const LIM={sqft:[300,1200],cpsf:[100,500],permits:[0,30000],hookup:[0,60000],foundation:[3000,50000],sitePrep:[1000,30000],utilTrench:[2000,30000],electrical:[0,8000],hardscape:[0,10000],design:[0,25000],surveys:[0,12000],contingency:[0,20],markup:[0,40],strADR:[50,400],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,25000],cashDown:[0,100],origFee:[1,40],rate:[3,14],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],incomeTax:[0,50],customRent:[0,100000]};
+const INT_KEYS=new Set(["term","strMonths","buildMonths","horizon"]);
+const ENUMS={rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
 function cleanField(k,raw){
   const d=DEF[k];
   if(typeof d==="boolean")return raw===true||raw==="1"||raw==="true";
@@ -101,7 +137,7 @@ function cleanField(k,raw){
     const l=LIM[k];
     return l?Math.min(l[1],Math.max(l[0],n)):n;
   }
-  if(k==="rentalMode")return MODES.includes(raw)?raw:undefined;
+  if(ENUMS[k])return ENUMS[k].includes(raw)?raw:undefined;
   return typeof raw==="string"?raw.slice(0,200):undefined;
 }
 function cleanState(src){
@@ -159,7 +195,8 @@ function useWidth(ref,fallback){
   return w;
 }
 
-// Year-based line chart used by both consumer charts. pts: [{year,...values}];
+// Year-based line chart used by both consumer charts. pts: [{year,...values,label?,hidden?}] —
+// years may be fractional; hidden points shape the line but get no dot or hover target.
 // series: [{key,color,width,dash,opacity}]; the first series is the interactive one.
 function TimeChart({pts,series,area,pointColor,vlines=[],marker,tooltip,height=230,ariaLabel}){
   const wrapRef=useRef(null);const W=useWidth(wrapRef,820);const uid=useId().replace(/:/g,"");
@@ -178,7 +215,9 @@ function TimeChart({pts,series,area,pointColor,vlines=[],marker,tooltip,height=2
   const areaD=mainD+" L"+xC(xMax).toFixed(1)+","+zeroY.toFixed(1)+" L"+xC(pts[0].year).toFixed(1)+","+zeroY.toFixed(1)+" Z";
   const yTicks=[];for(let v=lo;v<=hi+step/2;v+=step)yTicks.push(v);
   const xEvery=Math.max(1,Math.ceil(xMax/Math.max(2,Math.floor(cW/46))));
-  const band=cW/Math.max(1,pts.length-1);
+  // Hover targets span halfway to each visible neighbour, so uneven spacing still works.
+  const vis=pts.map((p,i)=>i).filter(i=>!pts[i].hidden);
+  const edges=vis.map((i,j)=>{const x=xC(pts[i].year),l=j>0?(x+xC(pts[vis[j-1]].year))/2:x-12,r=j<vis.length-1?(x+xC(pts[vis[j+1]].year))/2:x+12;return{i,l,r}});
   const hp=hov!==null?pts[hov]:null;
   const tipLeft=hp?Math.min(Math.max(xC(hp.year),80),W-80):0;
   return(<div ref={wrapRef} style={{position:"relative"}}>
@@ -200,9 +239,9 @@ function TimeChart({pts,series,area,pointColor,vlines=[],marker,tooltip,height=2
         // The line rises through the marker, so put the label on the side it's coming from (left, above zero).
         const mx=xC(marker.x),left=mx-PL>90;
         return(<><circle cx={mx} cy={zeroY} r="5" fill={marker.color} stroke="#fff" strokeWidth="2"/><text x={left?mx-9:mx+9} y={zeroY-9} textAnchor={left?"end":"start"} fontSize={FS} fill={marker.color} fontWeight="600" stroke="#fff" strokeWidth="3" paintOrder="stroke">{marker.label}</text></>)})()}
-      {pts.filter(p=>p.year%xEvery===0).map(p=><text key={p.year} x={xC(p.year)} y={H-PB+16} textAnchor="middle" fontSize={FS} fill="#64748b">{"Yr "+p.year}</text>)}
-      {pts.map((p,i)=><circle key={i} cx={xC(p.year)} cy={yC(p[main])} r={hov===i?6:narrow?2.5:3.5} fill={pointColor?pointColor(p):series[0].color} stroke="#fff" strokeWidth={hov===i?2.5:1.2} style={{pointerEvents:"none"}}/>)}
-      {pts.map((p,i)=><rect key={"h"+i} x={xC(p.year)-band/2} y={PT} width={band} height={cH} fill="transparent" style={{cursor:"pointer"}} onMouseEnter={()=>{if(!pin)setHov(i)}} onMouseLeave={()=>{if(!pin)setHov(null)}} onClick={e=>{e.stopPropagation();setPin(true);setHov(i)}}/>)}
+      {pts.filter(p=>!p.hidden&&Number.isInteger(p.year)&&p.year%xEvery===0).map(p=><text key={p.year} x={xC(p.year)} y={H-PB+16} textAnchor="middle" fontSize={FS} fill="#64748b">{"Yr "+p.year}</text>)}
+      {pts.map((p,i)=>!p.hidden&&<circle key={i} cx={xC(p.year)} cy={yC(p[main])} r={hov===i?6:narrow?2.5:3.5} fill={pointColor?pointColor(p):series[0].color} stroke="#fff" strokeWidth={hov===i?2.5:1.2} style={{pointerEvents:"none"}}/>)}
+      {edges.map(({i,l,r})=><rect key={"h"+i} x={l} y={PT} width={Math.max(1,r-l)} height={cH} fill="transparent" style={{cursor:"pointer"}} onMouseEnter={()=>{if(!pin)setHov(i)}} onMouseLeave={()=>{if(!pin)setHov(null)}} onClick={e=>{e.stopPropagation();setPin(true);setHov(i)}}/>)}
     </svg>
     {hp&&<div style={{position:"absolute",left:tipLeft,top:yC(hp[main]),transform:"translate(-50%, calc(-100% - 12px))",background:"#0f172a",color:"#fff",padding:"7px 11px",borderRadius:8,fontSize:12,fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap",pointerEvents:"none",boxShadow:"0 4px 12px rgba(0,0,0,0.15)",zIndex:10}}>{tooltip(hp)}</div>}
   </div>);
@@ -306,7 +345,28 @@ const SRC=[
 const LT={bg:"#f8fafc",card:"#ffffff",border:"#e2e8f0",borderLight:"#f1f5f9",text:"#0f172a",body:"#475569",muted:"#64748b",mutedLight:"#94a3b8",pos:"#16a34a",posBg:"#dcfce7",info:"#2563eb",infoBg:"#dbeafe",warn:"#d97706",warnBg:"#fef3c7",neg:"#dc2626",negBg:"#fee2e2"};
 const ltCard={background:LT.card,border:"1px solid "+LT.border,borderRadius:12,boxShadow:"0 1px 3px rgba(15,23,42,0.04)"};
 
-function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+// Consumer-view card with a years slider and quick presets (loan term, or evaluation horizon when all-cash).
+function YearsCard({title,value,onChange,min,max,presets,unit,aria,note}){
+  return(<div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,gap:8}}>
+      <span style={{fontSize:12,color:LT.body}}>{title}</span>
+      <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text,whiteSpace:"nowrap"}}>{value}{unit}</span>
+    </div>
+    <input type="range" aria-label={aria} min={min} max={max} step={1} value={value} onChange={e=>onChange(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:0}}/>
+    <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+      <span style={{fontSize:11,color:LT.muted}}>{min} years</span>
+      <span style={{fontSize:11,color:LT.muted}}>{max} years</span>
+    </div>
+    <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}} className="no-print">
+      {presets.map(v=>(
+        <button key={v} type="button" onClick={()=>onChange(v)} style={{padding:"5px 12px",borderRadius:6,fontSize:11,fontWeight:value===v?600:500,cursor:"pointer",userSelect:"none",border:"1px solid "+(value===v?LT.info:LT.border),background:value===v?LT.info:LT.card,color:value===v?LT.card:LT.body,transition:"all 0.15s",fontFamily:"inherit"}}>{v} yr</button>
+      ))}
+    </div>
+    <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5}}>{note}</div>
+  </div>);
+}
+
+function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -316,7 +376,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
     <div style={{marginBottom:28,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}>
       <div>
       <h1 style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,letterSpacing:"-0.02em",color:LT.text,margin:"0 0 6px"}}>Your ADU Investment Summary</h1>
-      <p style={{fontSize:14,color:LT.body,margin:0,lineHeight:1.5}}>{sqft} sq ft {utype.toLowerCase()} · {fD(total)} project · {rate.toFixed(1)}% / {term}-year financing{cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""}</p>
+      <p style={{fontSize:14,color:LT.body,margin:0,lineHeight:1.5}}>{sqft} sq ft {utype.toLowerCase()} · {fD(total)} project · {loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash"}</p>
       </div>
       <div className="no-print" style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap"}}>
         <button onClick={()=>window.print()} style={{background:LT.card,border:"1px solid "+LT.border,borderRadius:8,color:LT.body,fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>Print / Save as PDF</button>
@@ -369,38 +429,28 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
       </div>
       <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5}}>
         {cashDown===0?"100% financed at "+rate.toFixed(1)+"%. Monthly payment: "+fD(loanPmt)+". No cash out of pocket.":cashDown===100?"No loan needed — you own the ADU outright from day one. All returns are pure cash flow.":fD(cashDownAmt)+" cash + "+fD(loanAmt)+" financed at "+rate.toFixed(1)+"%. Monthly payment: "+fD(loanPmt)+"."}
+        {cm.conPaid>0?" Plus about "+fD(cm.conPaid)+" of interest-only payments on the funds drawn during the "+buildMonths+"-month build.":cm.conCap>0?" Includes about "+fD(cm.conCap)+" of construction-period interest added to the loan.":""}
       </div>
     </div>
 
+    {loanAmt>0?(<>
     {/* INTEREST RATE — read-only here; only adjustable in the Internal view */}
     <div style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
       <div>
         <div style={{fontSize:12,color:LT.body,marginBottom:2}}>Interest rate on your loan</div>
-        <div style={{fontSize:10.5,color:LT.muted}}>Fixed for this estimate — adjustable only in the Internal view.</div>
+        <div style={{fontSize:11,color:LT.muted}}>Fixed for this estimate — adjustable only in the Internal view.</div>
       </div>
       <span style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:LT.text}}>{rate.toFixed(1)}%</span>
     </div>
 
     {/* LOAN TERM SLIDER — consumer-facing, syncs with internal */}
-    <div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-        <span style={{fontSize:12,color:LT.body}}>How long is your loan?</span>
-        <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text}}>{term}-year loan</span>
-      </div>
-      <input type="range" aria-label="Loan term in years" min={5} max={20} step={1} value={term} onChange={e=>setTerm(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:0}}/>
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
-        <span style={{fontSize:11,color:LT.muted}}>5 years</span>
-        <span style={{fontSize:11,color:LT.muted}}>20 years</span>
-      </div>
-      <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}} className="no-print">
-        {[{v:5,l:"5 yr"},{v:10,l:"10 yr"},{v:15,l:"15 yr"},{v:20,l:"20 yr"}].map(p=>(
-          <button key={p.v} onClick={()=>setTerm(p.v)} style={{padding:"5px 12px",borderRadius:6,fontSize:11,fontWeight:term===p.v?600:500,cursor:"pointer",userSelect:"none",border:"1px solid "+(term===p.v?LT.info:LT.border),background:term===p.v?LT.info:LT.card,color:term===p.v?LT.card:LT.body,transition:"all 0.15s",fontFamily:"inherit"}}>{p.l}</button>
-        ))}
-      </div>
-      <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5}}>
-        {term<=10?"Shorter loan = higher monthly payments but less interest paid overall. Monthly payment: "+fD(loanPmt)+".":"Longer loan = lower monthly payments ("+fD(loanPmt)+") but more interest paid over time."}
-      </div>
-    </div>
+    <YearsCard title="How long is your loan?" value={term} onChange={setTerm} min={5} max={20} presets={[5,10,15,20]} unit="-year loan" aria="Loan term in years"
+      note={term<=10?"Shorter loan = higher monthly payments but less interest paid overall. Monthly payment: "+fD(loanPmt)+".":"Longer loan = lower monthly payments ("+fD(loanPmt)+") but more interest paid over time."}/>
+    </>):(
+    /* ALL CASH — no loan, so choose how many years of ownership to evaluate instead */
+    <YearsCard title="How many years should we look at?" value={horizon} onChange={setHorizon} min={5} max={30} presets={[5,10,20,30]} unit=" years" aria="Years to evaluate"
+      note={"With no loan, this only sets how far out the summary looks — returns, cash collected and the full picture are measured at year "+horizon+" of renting."}/>
+    )}
 
     {!hasCustom&&!isSTR&&(
       <div style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
@@ -437,14 +487,14 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6,gap:8,flexWrap:"wrap"}}>
         <div style={secH}>Monthly breakdown</div>
-        <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:LT.text}}>Rental year {barYear}{barYear>term?" (post-loan)":""}</span>
+        <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:LT.text}}>Rental year {Math.min(barYear,cm.bars.length)}{loanAmt>0&&barYear>term?" (post-loan)":""}</span>
       </div>
       <div style={{marginBottom:14}}>
-        <input type="range" aria-label="Rental year" min={1} max={term+3} step={1} value={barYear} onChange={e=>setBarYear(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:5,cursor:"pointer",margin:0}}/>
+        <input type="range" aria-label="Rental year" min={1} max={cm.bars.length} step={1} value={Math.min(barYear,cm.bars.length)} onChange={e=>setBarYear(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:5,cursor:"pointer",margin:0}}/>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:LT.muted,marginTop:4}}>
           <span>Year 1</span>
-          <span>Year {term} (loan ends)</span>
-          <span>Year {term+3}</span>
+          {loanAmt>0&&<span>Year {term} (loan ends)</span>}
+          <span>Year {cm.bars.length}</span>
         </div>
       </div>
       {(()=>{
@@ -501,7 +551,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
         <div style={{marginTop:12,padding:"10px 14px",borderRadius:8,background:netPos?LT.posBg:LT.warnBg,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <div>
             <span style={{fontFamily:"'Fraunces',serif",fontSize:20,fontWeight:700,color:netPos?LT.pos:LT.warn}}>{netPos?"+":""}{fD(netMo)}/mo</span>
-            <span style={{fontSize:13,color:LT.body,marginLeft:10}}>{netPos?"Net income":"Net subsidy"} in rental year {barYear}</span>
+            <span style={{fontSize:13,color:LT.body,marginLeft:10}}>{netPos?"Net income":"Net subsidy"} in rental year {Math.min(barYear,cm.bars.length)}</span>
           </div>
           <div style={{fontSize:11.5,color:LT.muted,lineHeight:1.4,maxWidth:260}}>{loanAmt===0?"No loan — all net rent is yours from day one.":barYear>term?"Loan paid off — all net rent is yours.":!netPos&&growth>0?"Rent grows "+growth+"%/yr while the payment stays fixed.":netPos?"The ADU is cash-flow positive.":""}</div>
         </div>
@@ -515,8 +565,8 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
       {[
         {k:"Year-1 cash flow",v:<>{y1Pos?"+":""}{fD(y1.net)}<span style={{fontSize:12,color:LT.muted,fontWeight:400}}>/mo</span></>,c:y1Pos?LT.pos:LT.warn,s:"Average month: rent − expenses"+taxNote+(loanAmt>0?" − "+fD(loanPmt)+" loan":"")},
         {k:"Years to cash positive",v:cm.cfPlus<=0?"Day one":fYr(cm.cfPlus),c:cm.cfPlus<=0?LT.pos:cm.cfAtTerm||cm.cfPlus===Infinity?LT.warn:LT.pos,s:cm.cfPlus<=0?"Positive from the first rent check":cm.cfPlus===Infinity?"Expenses outpace rent":cm.cfAtTerm?"Only once the loan is paid off":"When growing rent overtakes the loan payment"},
-        {k:"Payback period",v:cm.po===0?"Immediate":fYr(cm.po),c:cm.po<=term?LT.pos:cm.po<=term*1.5?LT.warn:LT.neg,s:cm.po===0?"You're never out of pocket":"Until every dollar you put in is back"},
-        {k:"Income after the loan",v:<>{fD(post.net)}<span style={{fontSize:12,color:LT.muted,fontWeight:400}}>/mo</span></>,c:post.net>=0?LT.pos:LT.neg,s:"Rental year "+(term+1)+", after expenses"+taxNote+"; rent grown to "+fD(post.rent)+"/mo"},
+        {k:"Payback period",v:cm.po===0?"Immediate":fYr(cm.po),c:cm.po<=cm.evalYrs?LT.pos:cm.po<=cm.evalYrs*1.5?LT.warn:LT.neg,s:cm.po===0?"You're never out of pocket":"Until every dollar you put in is back"},
+        {k:loanAmt>0?"Income after the loan":"Income in year "+cm.evalYrs,v:<>{fD(post.net)}<span style={{fontSize:12,color:LT.muted,fontWeight:400}}>/mo</span></>,c:post.net>=0?LT.pos:LT.neg,s:"Rental year "+(loanAmt>0?term+1:cm.evalYrs)+", after expenses"+taxNote+"; rent grown to "+fD(post.rent)+"/mo"},
       ].map(t=>(
         <div key={t.k} style={{...ltCard,padding:"16px 16px"}}>
           <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:8,lineHeight:1.3}}>{t.k}</div>
@@ -540,14 +590,14 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
           <div style={{fontSize:12,color:cm.valueY1>=total?LT.pos:LT.warn,fontWeight:600,marginTop:2}}>{(cm.valueY1/total).toFixed(1)}× your cost</div>
         </div>
         <div style={{textAlign:"center",padding:"14px 10px",borderRadius:10,background:cm.valueEnd>=total?LT.posBg:LT.warnBg}}>
-          <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:500,marginBottom:6}}>{loanAmt>0?"Value at loan payoff":"Value in year "+term}</div>
+          <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:500,marginBottom:6}}>{loanAmt>0?"Value at loan payoff":"Value in year "+cm.evalYrs}</div>
           <div style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:cm.valueEnd>=total?LT.pos:LT.warn}}>{fK2(cm.valueEnd)}</div>
           <div style={{fontSize:12,color:cm.valueEnd>=total?LT.pos:LT.warn,fontWeight:600,marginTop:2}}>{(cm.valueEnd/total).toFixed(1)}× your cost</div>
         </div>
       </div>
       <div style={{fontSize:12.5,color:LT.body,lineHeight:1.6}}>
         {cm.valueY1>=total?"You create immediate equity: once built, the ADU adds an estimated "+fD(cm.valueY1)+" to your property value — "+fD(cm.valueY1-total)+" more than what you paid.":"The ADU initially appraises "+fD(total-cm.valueY1)+" below its cost — common with high site work or premium finishes."}
-        {growth>0?" As rents grow "+growth+"%/yr, that value climbs to an estimated "+fK2(cm.valueEnd)+" by "+(loanAmt>0?"loan payoff":"year "+term)+".":""}
+        {growth>0?" As rents grow "+growth+"%/yr, that value climbs to an estimated "+fK2(cm.valueEnd)+" by "+(loanAmt>0?"loan payoff":"year "+cm.evalYrs)+".":""}
       </div>
       <div style={{fontSize:11,color:LT.muted,marginTop:8}}>Value estimates use a gross rent multiplier (110× monthly LTR rent). Actual appraisals use comparable sales and may differ. Coastal markets often see higher multipliers (200–300×), meaning these estimates may be conservative.</div>
     </div>
@@ -563,7 +613,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
         vlines={loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]}
         marker={cm.po>0&&cm.po!==Infinity?{x:cm.po,label:"Payback yr "+cm.po.toFixed(1),color:"#16a34a"}:null}
         tooltip={p=>(<>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>Year {p.year}</div>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>{p.label||"Year "+p.year}</div>
           <div style={{fontFamily:"'Fraunces',serif",fontSize:15,fontWeight:600,color:p.cash>=0?"#4ade80":"#fbbf24"}}>{p.cash>=0?"+":""}{fD(p.cash)}</div>
         </>)}/>
       <div style={{fontSize:12,color:LT.body,lineHeight:1.5,marginTop:8}}>
@@ -580,7 +630,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
         area={{pos:"#2563eb",neg:"#2563eb"}}
         vlines={loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]}
         tooltip={p=>{const row=(l,v,c)=>(<div style={{display:"flex",justifyContent:"space-between",gap:12,marginBottom:2}}><span style={{color:"#94a3b8",fontSize:12}}>{l}</span><span style={{fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:600,color:c}}>{v}</span></div>);return(<>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:500,marginBottom:4}}>Year {p.year}</div>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:500,marginBottom:4}}>{p.label||"Year "+p.year}</div>
           {row("ADU value",fD(p.value),"#fbbf24")}
           {row("Loan balance",p.bal>0?"−"+fD(p.bal):"$0",p.bal>0?"#f87171":"#4ade80")}
           {row("Cash position",(p.cash>=0?"+":"")+fD(p.cash),p.cash>=0?"#4ade80":"#fbbf24")}
@@ -599,7 +649,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
 
     {/* LIFE AFTER THE LOAN */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20,background:post.net>=0?"linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)":LT.warnBg,border:"1px solid "+(post.net>=0?"#bbf7d0":"#fde68a")}}>
-      <div style={{fontSize:11,color:post.net>=0?LT.pos:LT.warn,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:10}}>{loanAmt>0?"Life after the loan — rental year "+(term+1)+" onward":"Income in rental year "+(term+1)}</div>
+      <div style={{fontSize:11,color:post.net>=0?LT.pos:LT.warn,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:10}}>{loanAmt>0?"Life after the loan — rental year "+(term+1)+" onward":"Income in rental year "+cm.evalYrs}</div>
       <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap",marginBottom:10}}>
         <div style={{fontFamily:"'Fraunces',serif",fontSize:38,fontWeight:700,color:post.net>=0?LT.pos:LT.warn,lineHeight:1}}>{fD(post.net)}/mo</div>
         <div style={{fontSize:15,color:post.net>=0?"#166534":LT.body}}>= <strong>{fD(post.net*12)}/yr</strong>{post.net>=0?" in passive income":""}</div>
@@ -611,12 +661,12 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
 
     {/* WHAT YOU KEEP */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
-      <div style={{...secH,marginBottom:14}}>{loanAmt>0?"What you have when the loan is paid off":"What you have after "+term+" years"}</div>
+      <div style={{...secH,marginBottom:14}}>{loanAmt>0?"What you have when the loan is paid off":"What you have after "+cm.evalYrs+" years"}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:24}}>
         {[
           ["A fully-paid ADU asset",<>Estimated value: <strong style={{color:LT.text}}>{fD(cm.valueEnd)}</strong> (rent-multiplier method)</>],
           ["Ongoing rental income",<>About <strong style={{color:LT.text}}>{fD(post.net)}/mo</strong> net{loanAmt>0?", with no loan payment":""}</>],
-          ["Cumulative cash flow",<>Approximately <strong style={{color:cm.cashCollected>=0?LT.pos:LT.warn}}>{cm.cashCollected>=0?"+":""}{fK2(cm.cashCollected)}</strong> {cm.cashCollected>=0?"collected":"in net subsidies"} {loanAmt>0?"over the loan term":"over "+term+" years"}</>],
+          ["Cumulative cash flow",<>Approximately <strong style={{color:cm.cashCollected>=0?LT.pos:LT.warn}}>{cm.cashCollected>=0?"+":""}{fK2(cm.cashCollected)}</strong> {cm.cashCollected>=0?"collected":"in net subsidies"} {loanAmt>0?"over the loan term":"over "+cm.evalYrs+" years"}</>],
           ["Multigenerational flexibility","You can house family, age in place, or change use without selling"],
         ].map(([h,s])=>(
           <div key={h} style={{display:"flex",alignItems:"baseline",gap:8}}>
@@ -629,14 +679,15 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
 
     {/* TOTAL ECONOMICS SUMMARY */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
-      <div style={{...secH,marginBottom:14}}>{loanAmt>0?"The full picture at loan payoff":"The full picture after "+term+" years"}</div>
+      <div style={{...secH,marginBottom:14}}>{loanAmt>0?"The full picture at loan payoff":"The full picture after "+cm.evalYrs+" years"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:0}}>
         {[
           {label:"Cash you invested"+(cashDownAmt>0?" ("+cashDown+"% down)":""),value:-cashDownAmt,sub:cashDownAmt===0?"100% financed — no cash out of pocket":loanAmt>0?"The rest is financed at "+rate.toFixed(1)+"%":"Paid in full, no loan",color:LT.text,icon:"↓"},
+          ...(cm.conPaid>0?[{label:"Construction-period interest",value:-cm.conPaid,sub:"Interest-only payments on the funds drawn during the "+buildMonths+"-month build",color:LT.warn,icon:"−"}]:[]),
           {label:"Cumulative net cash flow",value:cm.cashCollected,sub:cm.cashCollected>=0?"Rent after expenses"+taxNote+(loanAmt>0?" exceeded your loan payments":""):(cm.subsidies>0?"You covered "+fD(cm.subsidies)+" of monthly shortfalls along the way":"Monthly shortfalls before rent caught up"),color:cm.cashCollected>=0?LT.pos:LT.warn,icon:cm.cashCollected>=0?"+":"−"},
           {label:"Property value created",value:cm.valueEnd,sub:"Estimated ADU contribution to home value ("+fD(cm.valueY1)+" when complete, growing to "+fK2(cm.valueEnd)+")",color:LT.pos,icon:"+"},
           {label:"Total return",value:cm.ret,sub:(cm.roi===null?"":cm.roi.toFixed(1)+"%/yr compound on the "+fD(total)+" project cost")+(cm.roiCash!==null?" ("+cm.roiCash.toFixed(1)+"%/yr on the "+fD(cashDownAmt)+" you put in)":", with no cash out of pocket")+" — and the ADU keeps generating "+fD(post.net)+"/mo",color:cm.ret>=0?LT.pos:LT.neg,icon:"=",bold:true},
-        ].map((item,i)=>(<div key={i} style={{display:"flex",alignItems:"flex-start",padding:item.bold?"14px 16px":"11px 16px",borderBottom:i<3?"1px solid "+LT.borderLight:"none",background:item.bold?(cm.ret>=0?LT.posBg:LT.negBg):"transparent",borderRadius:item.bold?8:0}}>
+        ].map((item,i)=>(<div key={i} style={{display:"flex",alignItems:"flex-start",padding:item.bold?"14px 16px":"11px 16px",borderBottom:!item.bold?"1px solid "+LT.borderLight:"none",background:item.bold?(cm.ret>=0?LT.posBg:LT.negBg):"transparent",borderRadius:item.bold?8:0}}>
           <span style={{fontSize:item.bold?16:14,color:LT.muted,width:22,textAlign:"center",fontWeight:600,marginTop:2}}>{item.icon}</span>
           <div style={{flex:1,marginLeft:8}}>
             <div style={{fontSize:item.bold?15:13,color:item.bold?LT.text:LT.body,fontWeight:item.bold?600:500}}>{item.label}</div>
@@ -658,7 +709,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
           </tr>
         </thead>
         <tbody>
-          {cm.stress.map((t,i)=>{const cfCol=t.cfPlus<=3?LT.pos:t.cfPlus<=term&&!t.cfAtTerm?LT.warn:LT.neg;const poCol=t.po<=term?LT.pos:t.po<=term*1.5?LT.warn:LT.neg;const isBase=i===0;return(<tr key={i} style={{borderBottom:i<cm.stress.length-1?"1px solid "+LT.borderLight:"none",background:isBase?LT.borderLight:"transparent"}}>
+          {cm.stress.map((t,i)=>{const H=cm.evalYrs,cfCol=t.cfPlus<=3?LT.pos:t.cfPlus<=H&&!t.cfAtTerm?LT.warn:LT.neg;const poCol=t.po<=H?LT.pos:t.po<=H*1.5?LT.warn:LT.neg;const isBase=i===0;return(<tr key={i} style={{borderBottom:i<cm.stress.length-1?"1px solid "+LT.borderLight:"none",background:isBase?LT.borderLight:"transparent"}}>
             <td style={{padding:"10px 4px",color:LT.text,fontWeight:isBase?600:500}}>{t.label}</td>
             <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:cfCol}}>{t.cfPlus<=0?"Day one":fYr(t.cfPlus)+(t.cfAtTerm?"*":"")}</td>
             <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:poCol}}>{t.po===0?"Immediate":fYr(t.po)}</td>
@@ -682,7 +733,8 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,gr
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Property value</strong> uses a gross rent multiplier of 110× monthly rent — a heuristic widely cited by lenders and builders. Real appraisals use comparable sales as the primary method, and multipliers can vary substantially by market: low-cost regions trend toward 80–120×, while expensive coastal markets often run 200–300×. The 110× default is conservative for high-rent metros.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Operating expenses</strong> include property tax (with annual escalator), insurance (scaled to ADU replacement cost, with annual escalator), vacancy, maintenance reserve, and property management. Escalator defaults reflect recent 2020–2025 trends and vary by jurisdiction.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Income tax</strong> is modeled on US Schedule E: rental income minus loan interest, depreciation (27.5-year straight-line on the ADU cost basis, excluding furnishings), and operating expenses. Paper losses are not credited against other income. Default rate is 0% (not modeled); the Internal view's marginal-tax slider applies your combined federal + state rate. Passive activity loss rules and depreciation recapture at sale are not modeled.</div>
-        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Cash flow simulation</strong> runs month by month from project start: the construction period (no rent and no loan payments — interest during construction is not modeled), then rent and loan payments together, with rent growth, expense escalation, and tax effects compounded monthly. Every figure on this page comes from that one simulation. Loan amortization uses the standard mortgage formula. Payback is when your cumulative cash position — down payment plus every month's net cash flow after loan payments and tax — returns to zero. Annual returns are compound rates.</div>
+        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Cash flow simulation</strong> runs month by month from project start: the construction period, then rent and loan payments together, with rent growth, expense escalation, and tax effects compounded monthly. Every figure on this page comes from that one simulation. Loan amortization uses the standard mortgage formula. Payback is when your cumulative cash position — down payment plus every month's net cash flow after loan payments and tax — returns to zero. Annual returns are compound rates.</div>
+        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Construction financing</strong> follows standard draw practice: design, permits, fees and surveys are paid up front; your cash goes in before the lender funds anything; the lender then funds hard costs in monthly draws along an S-curve as work is inspected, holding back 5% retention until completion; furnishings are bought at the end. Interest accrues only on what's been drawn and is either paid monthly, added to the loan, or not charged, as set in the Internal view. Construction interest is capitalized into the depreciation basis for taxes.</div>
         <div><strong style={{color:LT.text}}>Limitations.</strong> The model does not capture construction cost overruns, regulatory changes, mortgage refinancing, depreciation recapture at sale, transaction costs at exit, jurisdiction-specific fees or incentives, short-term rental restrictions, or interactions with existing zoning. Always consult a tax professional and your local building department before committing capital.</div>
       </div>}
     </div>
@@ -725,24 +777,26 @@ function App(){
     else window.prompt("Copy this link:",url);
   },[state]);
   const set=useCallback(k=>v=>{if(k!=="view")fromShareRef.current=false;setState(s=>({...s,[k]:v}))},[]);
-  const{sqft,cpsf,permits,hookup,foundation,sitePrep,utilTrench,electrical,hardscape,design,surveys,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,customRent,customName,view}=state;
+  const{sqft,cpsf,permits,hookup,foundation,sitePrep,utilTrench,electrical,hardscape,design,surveys,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const hasSTR=isSTR||isHybrid;
   const buildCost=sqft*cpsf,siteCost=foundation+sitePrep+utilTrench+electrical+hardscape;
   const contingencyAmt=Math.round((buildCost+siteCost)*(contingency/100));
   const softCostBase=permits+hookup+design+surveys+furnishing;
-  const softCost=softCostBase+contingencyAmt;
   const markupBase=buildCost+siteCost+softCostBase;
-  const subtotal=buildCost+siteCost+softCost,markupAmt=Math.round(markupBase*(markup/100));
+  const subtotal=buildCost+siteCost+softCostBase+contingencyAmt,markupAmt=Math.round(markupBase*(markup/100));
   const assetCost=subtotal+markupAmt;
   const origFeeAmt=origFeeOn?Math.round(assetCost*(origFee/100)):0;
   const total=assetCost+origFeeAmt;
   const cashDownAmt=Math.round(total*(cashDown/100)),loanAmt=total-cashDownAmt;
-  const scale=rs(sqft),utype=ut(sqft),loanPmt=cMP(loanAmt,rate/100,term);
+  const isCash=loanAmt<=0;
+  const scale=rs(sqft),utype=ut(sqft);
   // Furnishings (with the GC markup on them) are personal property, not part of the
   // building — they're excluded from the 27.5-year depreciation basis.
   const furnBasis=Math.round(furnishing*(1+markup/100));
   const depBasis=Math.max(0,assetCost-furnBasis);
+  // Paid at the start of construction: design, permits, utility fees, surveys (with markup) and any loan fee.
+  const spendUp=Math.round((permits+hookup+design+surveys)*(1+markup/100))+origFeeAmt;
 
   // What the US-average 1-bed base scales to at this size — the fallback rent and
   // the sanity anchor shown in the rent field's help text.
@@ -771,17 +825,22 @@ function App(){
       const aC=assetCost*costMult,tot=aC+(origFeeOn?Math.round(aC*(origFee/100)):0),down=Math.round(tot*(cashDown/100));
       return runModel({loanAmt:tot-down,cashDown:down,annRate:rate/100,termYr:term,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
         mPTY1:(aC*(taxRate/100))/12,mInsY1:(aC*(insurance/100))/12,rentGrowth:effG,taxGrowthA:taxGrowth/100,insGrowthA:insGrowth/100,taxMarg:incomeTax/100,
-        depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*110,valueGrowth:growth/100});
+        depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*110,valueGrowth:growth/100,
+        conMode:conIntMode,conRate:(rate+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
     };
     const base=mk(1,1);
     const stress=[["Base case",1,1],["Rent 10% below estimate",0.9,1],["Rent 20% below estimate",0.8,1],["Construction 15% over budget",1,1.15],["Construction 25% over budget",1,1.25]]
       .map(([label,r,c])=>{const s=r===1&&c===1?base:mk(r,c);return{label,cfPlus:s.cfPlus,cfAtTerm:s.cfAtTerm,po:s.po}});
     return{base,stress};
-  },[assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,grossY1,vacPct,opPct,taxRate,insurance,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,growth]);
+  },[assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,growth]);
   const M0=mdl.base;
+  // The permanent-loan payment, including any construction interest added to the loan.
+  const loanPmt=M0.pmt;
   const first=M0.months[0];
-  const loanEndK=M0.loanEnd,horizonYrs=loanEndK/12;
-  const end=M0.at(loanEndK);
+  // Results are evaluated at loan payoff, or after the chosen horizon for an all-cash project.
+  const evalYrs=isCash?horizon:term;
+  const evalK=buildMonths+evalYrs*12,horizonYrs=evalK/12;
+  const end=M0.at(evalK);
   const ret=end.tot;
   const roi=annualized(ret,total,horizonYrs);
   const roiCash=cashDownAmt>0?annualized(ret,cashDownAmt,horizonYrs):null;
@@ -795,17 +854,28 @@ function App(){
 
   // Consumer-view metrics — all read from the same simulation.
   const cm=useMemo(()=>{
-    const ptsYears=Math.ceil(loanEndK/12)+3;
-    const pts=[];for(let y=0;y<=ptsYears;y++){const s=M0.at(y*12);pts.push({year:y,cash:s.cash,value:s.value,bal:s.bal,loanNeg:-s.bal,tot:s.tot})}
-    const bars=[];for(let y=1;y<=term+3;y++)bars.push(M0.year(y));
+    const ptsYears=Math.ceil(evalK/12)+(isCash?0:3);
+    const pt=(s,year,extra)=>({year,cash:s.cash,value:s.value,bal:s.bal,loanNeg:-s.bal,tot:s.tot,...extra});
+    let pts=[];for(let y=0;y<=ptsYears;y++)pts.push(pt(M0.at(y*12),y));
+    if(buildMonths>0){
+      // Mark completion: just before (everything spent, nothing appraised yet) and just after
+      // (the ADU's value lands), so the jump shows as a step instead of a slope across year 1.
+      const s=M0.at(buildMonths),x=buildMonths/12;
+      pts=pts.filter(p=>p.year!==x);
+      pts.push(pt({...s,value:0,tot:s.tot-s.value},x,{hidden:true}),pt(s,x,{label:"Build complete (month "+buildMonths+")"}));
+      pts.sort((a,b)=>a.year-b.year||(a.hidden?-1:1));
+    }
+    const bars=[];for(let y=1;y<=evalYrs+(isCash?0:3);y++)bars.push(M0.year(y));
     return{
-      pts,bars,postLoan:M0.year(term+1),loanEndYr:loanEndK/12,
+      pts,bars,isCash,evalYrs,postLoan:M0.year(isCash?evalYrs:term+1),loanEndYr:M0.loanEnd/12,
       hero:[10,15,20].map(Y=>{const s=M0.at(Y*12);return{yrs:Y,ret:s.tot,roi:annualized(s.tot,total,Y)}}),
       cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,
-      valueY1:ltrRent*110,valueEnd:end.value,cashCollected:end.cash+cashDownAmt,subsidies:M0.subsidies,
+      valueY1:ltrRent*110,valueEnd:end.value,subsidies:M0.subsidies,
+      // Operating cash flow only — construction interest paid out of pocket is shown on its own line.
+      cashCollected:end.cash+cashDownAmt+M0.conPaid,conPaid:M0.conPaid,conCap:M0.conCap,
       ret,roi,roiCash,stress:mdl.stress,
     };
-  },[mdl,term,total,cashDownAmt,ltrRent]);
+  },[mdl,term,total,cashDownAmt,ltrRent,evalK,evalYrs,isCash,buildMonths]);
 
   const handleReset=()=>{fromShareRef.current=false;setState(DEF);store.del(SK)};
   const onResetClick=()=>{
@@ -870,9 +940,11 @@ function App(){
             <TS label="Design & engineering" value={design} onChange={set("design")} min={0} max={25000} step={500} format={fD} ticks={[{value:3000,label:"Pre-approved",color:gn},{value:10000,label:"Custom arch.",color:tk},{value:18000,label:"Bay Area",color:tk}]}/>
             <TS label={<>Surveys & reports<IT align="left" text="A land survey confirms your property lines and where the ADU can legally sit. A soil report (geotechnical study) tells the engineer what kind of foundation the ground actually needs — required on many hillside or unstable-soil lots, skippable on a flat, already-documented one."/></>} value={surveys} onChange={set("surveys")} min={0} max={12000} step={500} format={v=>v===0?"Not required":fD(v)} ticks={[{value:0,label:"Not req'd",color:gn},{value:1500,label:"Survey only",color:tk},{value:3500,label:"Survey + soil",color:tb},{value:7000,label:"Full geotech",color:yl}]}/>
             <TS label={<>Furnishing<IT align="left" text={(hasSTR?"Furniture, linens, kitchenware, decor — everything a guest needs. The range, dishwasher, and refrigerator are already in structure $/sqft.":"Washer/dryer, furniture, or other extras beyond what the builder installs. The range, dishwasher, and refrigerator are already in structure $/sqft. Set to $0 if tenant-supplied.")+"\n\nFurnishings are not depreciated with the building in this model. Expect to replace them every 5–7 years ("+(hasSTR?"sooner with heavy guest turnover":"sooner with hard use")+") — budget for that from the maintenance reserve."}/></>} value={furnishing} onChange={set("furnishing")} min={0} max={25000} step={1000} format={v=>v===0?"Unfurnished":fD(v)} ticks={hasSTR?[{value:0,label:"Unfurnished",color:gn},{value:5000,label:"Basic",color:tk},{value:10000,label:"Standard",color:tb},{value:18000,label:"Design-forward",color:yl}]:[{value:0,label:"Unfurnished",color:gn},{value:1500,label:"Washer/dryer",color:tk},{value:5000,label:"Partial",color:tb},{value:12000,label:"Fully furnished",color:yl}]}/>
-            <TS label={<>Contingency<IT align="left" text={"Percentage of hard costs (structure + site work) set aside for unforeseen items — buried utilities, soil surprises, permit re-inspections, landscaping restoration.\n\n5% is standard for straightforward builds; 10–15% for complex sites or older neighborhoods with unknown infrastructure."}/></>} value={contingency} onChange={set("contingency")} min={0} max={20} step={1} format={v=>v===0?"None":v+"% ("+fD(contingencyAmt)+")"} ticks={[{value:0,label:"None",color:gn},{value:5,label:"Typical",color:tb},{value:10,label:"Complex",color:tk},{value:15,label:"High risk",color:yl}]}/>
-            <Sub label="Soft cost subtotal" value={softCost}/>
+            <Sub label="Soft cost subtotal" value={softCostBase}/>
           </div>
+
+          <SL>Contingency</SL>
+          <TS label={<>Contingency<IT align="left" text={"Percentage of hard costs (structure + site work) set aside for unforeseen items — buried utilities, soil surprises, permit re-inspections, landscaping restoration.\n\n5% is standard for straightforward builds; 10–15% for complex sites or older neighborhoods with unknown infrastructure."}/></>} value={contingency} onChange={set("contingency")} min={0} max={20} step={1} format={v=>v===0?"None":v+"% ("+fD(contingencyAmt)+")"} ticks={[{value:0,label:"None",color:gn},{value:5,label:"Typical",color:tb},{value:10,label:"Complex",color:tk},{value:15,label:"High risk",color:yl}]}/>
 
           <SL>Builder / GC margin</SL>
           <TS label={<>Markup on project<IT align="left" text="The general contractor's profit and overhead on top of raw materials and labor — it's how a builder stays in business, covers insurance, permits paperwork, and project management, and absorbs the risk of things going wrong. 0% (owner-builder) means you're acting as your own GC and only paying subcontractors directly."/></>} value={markup} onChange={set("markup")} min={0} max={40} step={1} format={v=>v===0?"Owner-builder":v+"% ("+fD(markupAmt)+")"} ticks={[{value:0,label:"Owner-builder",color:gn},{value:10,label:"Prefab co.",color:tb},{value:20,label:"Typical GC",color:tk},{value:25,label:"Design-build",color:yl},{value:35,label:"Premium",color:rd}]}/>
@@ -925,7 +997,7 @@ function App(){
             <TS label="Cash / equity down" value={cashDown} onChange={set("cashDown")} min={0} max={100} step={5} format={v=>v===0?"100% financed":v+"% ("+fD(cashDownAmt)+")"} ticks={[{value:0,label:"All loan",color:tb},{value:20,label:"20%",color:tk},{value:50,label:"50/50",color:tk},{value:100,label:"All cash",color:gn}]}/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18}}>
               <Sl label="Interest rate" value={rate} onChange={set("rate")} min={3} max={14} step={0.5} format={v=>v.toFixed(1)+"%"}/>
-              <Sl label="Loan term" value={term} onChange={set("term")} min={5} max={20} step={1} format={v=>v+" yr"}/>
+              {isCash?<Sl label="Years to evaluate" value={horizon} onChange={set("horizon")} min={5} max={30} step={1} format={v=>v+" yr"}/>:<Sl label="Loan term" value={term} onChange={set("term")} min={5} max={20} step={1} format={v=>v+" yr"}/>}
             </div>
             <div style={{marginTop:2}}>
               <Tog on={origFeeOn} onToggle={()=>set("origFeeOn")(!origFeeOn)} label="Loan origination / dealer fee" sub={origFeeOn?"Baked into the project price — like solar, the fee is invisible to the borrower":"Off — no origination fee (e.g. HELOC, credit union loan)"}/>
@@ -936,13 +1008,20 @@ function App(){
               )}
             </div>
             <div style={{borderTop:"1px solid #21262d",marginTop:10,paddingTop:8}}>
-              <TS label={<>Construction period<IT align="left" text={"Months from permit approval to first rent check. Loan payments don't start until construction is complete — this is dead time with no income and no payments, like solar.\n\nAll results are measured from project start, so a longer build pushes every result "+buildMonths+" months later. Interest during construction is not modeled — optimistic if you are on a construction loan or drawing a HELOC."}/></>} value={buildMonths} onChange={set("buildMonths")} min={0} max={18} step={1} format={v=>v===0?"Instant (prefab)":v+" months"} ticks={[{value:0,label:"Prefab",color:gn},{value:4,label:"Fast-track",color:tb},{value:6,label:"Typical",color:tk},{value:10,label:"Stick-built",color:yl},{value:15,label:"+permit delays",color:rd}]}/>
+              <TS label={<>Construction period<IT align="left" text={"Months from permit approval to first rent check. Regular loan payments start when the ADU is finished; until then there's no rent, and interest on the funds drawn so far is set below.\n\nAll results are measured from project start, so a longer build pushes every result "+buildMonths+" months later."}/></>} value={buildMonths} onChange={set("buildMonths")} min={0} max={18} step={1} format={v=>v===0?"Instant (prefab)":v+" months"} ticks={[{value:0,label:"Prefab",color:gn},{value:4,label:"Fast-track",color:tb},{value:6,label:"Typical",color:tk},{value:10,label:"Stick-built",color:yl},{value:15,label:"+permit delays",color:rd}]}/>
+              {loanAmt>0&&buildMonths>0&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+                <div style={{fontSize:12,color:"#8b949e"}}>Interest during construction<IT align="left" text={"How construction financing works in this model:\n\nDesign, permits, utility fees and surveys are paid at the start. Your cash goes in first — lenders require it before they fund anything. The lender then funds the rest in monthly draws as work is completed and inspected, following the typical S-curve (slow start, fast framing and rough-in, slow finish work). 5% retention is held back until completion, and furnishings are bought at the end.\n\nYou pay interest only on what's been drawn, so the average balance during the build is typically 40–55% of the loan.\n\nHELOCs and most construction-to-permanent loans bill that interest monthly. Some lenders add it to the loan instead, which raises the permanent payment.\n\nFor taxes, construction interest is capitalized into the building's depreciation basis rather than deducted."}/></div>
+                <ModePills label="Interest during construction" value={conIntMode} onChange={set("conIntMode")} options={[{value:"paid",label:"Paid monthly"},{value:"cap",label:"Added to loan"},{value:"none",label:"Not charged"}]}/>
+                {conIntMode!=="none"&&<TS label={<>Construction-phase rate<IT align="left" text={"Extra interest charged during the build, on top of the "+rate.toFixed(1)+"% loan rate.\n\nHELOCs keep the same rate. Construction-to-permanent loans often price the build phase 0.5–1% higher; standalone bank construction loans 1–2% higher; private/hard-money lenders more."}/></>} value={conPremium} onChange={set("conPremium")} min={0} max={3} step={0.25} format={v=>v===0?"Same as loan ("+rate.toFixed(1)+"%)":"+"+v+"% ("+(rate+v).toFixed(2)+"%)"} ticks={[{value:0,label:"HELOC",color:gn},{value:0.75,label:"Constr.-to-perm",color:tb},{value:1.5,label:"Bank constr.",color:tk},{value:3,label:"Private lender",color:rd}]}/>}
+                <div style={{fontSize:11,color:conIntMode==="none"?yl:tb,lineHeight:1.45}}>{conIntMode==="none"?"No construction interest — only realistic if the builder or a grant carries the financing until completion.":"About "+fD(M0.conInterest)+" of interest over the "+buildMonths+"-month build, on an average drawn balance of "+fD(M0.conAvgDrawn)+". "+(conIntMode==="paid"?"Paid out of pocket as interest-only payments before rent starts.":"Added to the loan at completion, raising the monthly payment to "+fD(loanPmt)+".")}</div>
+              </div>)}
             </div>
           </div>
         </Section>
         <div style={{...card,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10,fontSize:12,color:"#8b949e",padding:"12px 18px",marginBottom:12}}>
           <span>Monthly payment: <strong style={{color:"#e6edf3"}}>{loanAmt>0?fD(loanPmt)+"/mo":"$0 (all cash)"}</strong></span>
           <span>{loanAmt>0?"Total repaid: ":"Cash invested: "}<strong style={{color:"#e6edf3"}}>{loanAmt>0?fD(loanPmt*term*12):fD(total)}</strong>{cashDown>0&&loanAmt>0&&<span> + {fD(cashDownAmt)} cash</span>}</span>
+          {M0.conInterest>0&&<span>Construction interest: <strong style={{color:"#e6edf3"}}>{fD(M0.conInterest)}</strong> {conIntMode==="paid"?"(paid during build)":"(in the loan)"}</span>}
         </div>
 
         {/* RENT YOU'D CHARGE */}
@@ -1067,7 +1146,7 @@ function App(){
         </>);})():(<div style={{...card,marginTop:8,padding:"32px 24px",textAlign:"center"}}><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.6}}>Enter the monthly rent you'd charge above to see the results for this site. Break-even for the project as configured is <strong style={{color:"#e6edf3"}}>{fD(Math.round(beRent))}/mo</strong>.</p></div>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>
