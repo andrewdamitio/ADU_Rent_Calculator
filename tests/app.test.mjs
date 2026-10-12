@@ -362,6 +362,28 @@ describe("site facts", () => {
   });
 });
 
+describe("tax loss carryover", () => {
+  const taxTotal = r => {
+    const table = [...r.querySelectorAll("table")].at(-1);
+    const head = [...table.querySelectorAll("th")].map(th => th.textContent), i = head.indexOf("Income tax");
+    const total = [...table.querySelectorAll("tbody tr")].at(-1).children[i].textContent;
+    return Number(total.replace(/[(),]/g, "")) || 0;
+  };
+  test("only offered when income tax is modeled", async () => {
+    assert.doesNotMatch((await load("?customRent=2600")).text(), /Carry rental losses forward/);
+    assert.match((await load("?customRent=2600&incomeTax=32")).text(), /Carry rental losses forward/);
+  });
+  test("carrying losses forward lowers total tax and raises the return", async () => {
+    const qs = "?customRent=2600&cashDown=20&incomeTax=32&view=consumer"; // early-year paper losses at this rent
+    const on = await load(qs), off = await load(qs + "&lossCarry=0");
+    assert.ok(taxTotal(on.report()) < taxTotal(off.report()), taxTotal(on.report()) + " vs " + taxTotal(off.report()));
+    const ret = p => money(p.text().match(/Total return[^+−]*([+−]\$[\d.]+k)/)[1].replace("k", "")) ;
+    assert.ok(ret(on) > ret(off));
+    assert.match(on.report().textContent, /Early paper losses carry forward against later rental income/);
+    assert.match(off.report().textContent, /Early paper losses are ignored/);
+  });
+});
+
 describe("budget confidence", () => {
   const panel = t => {
     const m = t.match(/Quoted or known(\d+)%of the line-item budgetP50 \/ P80 build cost(\$[\d,]+) \/ (\$[\d,]+)50% \/ 80% chance it costs lessYour budget holds(?:≈ )?(\d+)%of the time, with (\d+)% contingencyContingency for P80(\d+)%of hard costs/);

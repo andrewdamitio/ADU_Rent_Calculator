@@ -32,7 +32,7 @@ const SIM_YEARS=50,DEP_MONTHS=330; // 27.5-year residential depreciation
 const RETENTION=0.05;
 function runModel(p){
   const{loanAmt,cashDown,annRate,termYr,buildMo,grossY1,collectPct,opPct,mPTY1,mInsY1,rentGrowth,taxGrowthA,insGrowthA,taxMarg,depBasis,valueY1,valueGrowth,
-    conMode="none",conRate=annRate,spendUp=0,spendEnd=0,leaseUp=0}=p;
+    conMode="none",conRate=annRate,spendUp=0,spendEnd=0,leaseUp=0,lossCarry=false}=p;
   const bm=buildMo||0,n=termYr*12,mr=annRate/12;
   const mg=x=>x>0?Math.pow(1+x,1/12)-1:0;
   const mrG=mg(rentGrowth),mtG=mg(taxGrowthA),miG=mg(insGrowthA),mvG=mg(valueGrowth);
@@ -42,12 +42,13 @@ function runModel(p){
   const total=loanAmt+cashDown,hard=Math.max(0,total-spendUp-spendEnd);
   const spentAt=k=>{if(k>=bm)return total;const f=k/bm;return spendUp+hard*(1-RETENTION)*f*f*(3-2*f)};
   const conMr=loanAmt>0&&conMode!=="none"?conRate/12:0;
-  let equity=0,drawn=0,capInt=0,conPaid=0,conBalSum=0;
+  let equity=0,drawn=0,capInt=0,conPaid=0,conBalSum=0,depTaken=0;
   const spend=S=>{const e=Math.min(S,cashDown),d=Math.max(0,S-cashDown);const de=e-equity;equity=e;drawn=d;return de};
 
-  let cash=-spend(spentAt(0)),bal=drawn,pmt=0,dep=0,cfm=-1,subsidies=0;
+  // nol: rental tax losses carried forward (passive losses most owners can't use against other income).
+  let cash=-spend(spentAt(0)),bal=drawn,pmt=0,dep=0,cfm=-1,subsidies=0,nol=0;
   const months=[]; // one entry per rented month; months[0] is the first rent check
-  const snap=[{k:0,cash,bal,value:valueAt(0),tot:valueAt(0)-bal+cash}]; // position after k months
+  const snap=[{k:0,cash,bal,value:valueAt(0),tot:valueAt(0)-bal+cash,nol:0,depTaken:0}]; // position after k months
   let payK=cash>=0?0:-1;
   for(let k=0;k<bm+SIM_YEARS*12;k++){
     const m=k-bm;
@@ -72,7 +73,9 @@ function runModel(p){
       const pay=inLoan?Math.min(pmt,bal+interest):0;
       const principal=pay-interest;
       bal=Math.max(0,bal-principal);
-      const taxable=noi-interest-(m<DEP_MONTHS?dep:0);
+      const depM=m<DEP_MONTHS?dep:0;depTaken+=depM;
+      let taxable=noi-interest-depM;
+      if(lossCarry){if(taxable<0){nol-=taxable;taxable=0}else{const use=Math.min(nol,taxable);nol-=use;taxable-=use}}
       const tax=taxMarg>0&&taxable>0?taxable*taxMarg:0;
       const flow=noi-tax-pay;
       cash+=flow;
@@ -81,7 +84,7 @@ function runModel(p){
       months.push({rent,vacOpex:rent-coll+opex,pt,ins,tax,pay,interest,principal,noi,flow});
     }
     const kk=k+1,value=valueAt(kk);
-    snap.push({k:kk,cash,bal,value,tot:value-bal+cash});
+    snap.push({k:kk,cash,bal,value,tot:value-bal+cash,nol,depTaken});
     // Payback is the LAST time cash turns non-negative, so a later dip un-does it.
     if(cash>=0){if(payK<0)payK=kk}else payK=-1;
   }
@@ -176,7 +179,7 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,incomeTax:0,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -1181,7 +1184,7 @@ function ConsumerView({cm,verdict,rentY1,unitNoun,grm,assetCost,origFeeAmt,origF
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Construction costs</strong> are built up from line-item components (structure, foundation, site work, permits, fees, design, surveys) at 2026 mid-range defaults, plus a builder/GC margin. Garage conversions, prefab units, and high-cost markets are reflected via slider tick marks. Costs vary substantially by region and site conditions — adjust the sliders to match local builder quotes.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Property value</strong> uses a gross rent multiplier of {grm}× monthly long-term rent — a heuristic widely cited by lenders and builders. Real appraisals use comparable sales as the primary method, and multipliers can vary substantially by market: low-cost regions trend toward 80–120×, while expensive coastal markets often run 200–300×. The default of 110× is conservative for high-rent metros.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Operating expenses</strong> include property tax (with annual escalator), insurance (a rate on the building's replacement cost — structure and foundation, not fees or site work — with annual escalator), vacancy, maintenance reserve, and property management. Escalator defaults reflect recent 2020–2025 trends and vary by jurisdiction.</div>
-        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Income tax</strong> is modeled on US Schedule E: rental income minus loan interest, depreciation (27.5-year straight-line on the ADU cost basis, excluding furnishings), and operating expenses. Paper losses are not credited against other income. Default rate is 0% (not modeled); the Full model's marginal-tax slider applies your combined federal + state rate. Passive activity loss rules and depreciation recapture at sale are not modeled.</div>
+        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Income tax</strong> is modeled on US Schedule E: rental income minus loan interest, depreciation (27.5-year straight-line on the ADU cost basis, excluding furnishings), and operating expenses. Paper losses aren't deducted against other income (the passive-loss rules); with "Carry rental losses forward" on, they offset later rental income instead. Default rate is 0% (not modeled); the Full model's marginal-tax slider applies your combined federal + state rate.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Cash flow simulation</strong> runs month by month from project start: the construction period, then rent and loan payments together, with rent growth, expense escalation, and tax effects compounded monthly. Every figure on this page comes from that one simulation. Loan amortization uses the standard mortgage formula. Payback is when your cumulative cash position — down payment plus every month's net cash flow after loan payments and tax — returns to zero. Annual returns are compound rates.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Construction financing</strong> follows standard draw practice: design, permits, fees and surveys are paid up front; your cash goes in before the lender funds anything; the lender then funds hard costs in monthly draws along an S-curve as work is inspected, holding back 5% retention until completion; furnishings are bought at the end. Interest accrues only on what's been drawn and is either paid monthly, added to the loan, or not charged, as set in the Full model. Construction interest is capitalized into the depreciation basis for taxes.</div>
         <div><strong style={{color:LT.text}}>Limitations.</strong> The model does not capture construction cost overruns, regulatory changes, mortgage refinancing, depreciation recapture at sale, transaction costs at exit, jurisdiction-specific fees or incentives, short-term rental restrictions, or interactions with existing zoning. Always consult a tax professional and your local building department before committing capital.</div>
@@ -1229,7 +1232,7 @@ function App(){
   const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,...PTYPES[t].f,projectType:t}))},[]);
   // Switching to dollar amounts starts the sliders at what the site facts produced, so nothing jumps.
   const setSiteMode=useCallback(m=>{fromShareRef.current=false;setState(s=>m==="dollars"&&s.siteMode!=="dollars"?{...s,siteMode:m,...siteDollars(siteFromFacts(s,s.sqft))}:{...s,siteMode:m})},[]);
-  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,incomeTax,firmOn,firm,customRent,customName,view}=state;
+  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,incomeTax,lossCarry,firmOn,firm,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const ptype=PTYPES[projectType]||PTYPES.detached;
   // Site work: from the site facts, or the dollar sliders when the user prefers to enter amounts.
@@ -1288,7 +1291,7 @@ function App(){
     const mk=({rentMult=1,costMult=1,rateAdd=0,leaseUp=0}={})=>{
       const aC=assetCost*costMult,tot=aC+(origFeeOn?Math.round(aC*(origFee/100)):0),down=Math.round(tot*(cashDown/100));
       return runModel({loanAmt:tot-down,cashDown:down,annRate:(rate+rateAdd)/100,termYr:term,leaseUp,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
-        mPTY1:(aC*(taxRate/100))/12,mInsY1:(insBase*costMult*(insurance/100))/12,rentGrowth:effG,taxGrowthA:taxGrowth/100,insGrowthA:insGrowth/100,taxMarg:incomeTax/100,
+        mPTY1:(aC*(taxRate/100))/12,mInsY1:(insBase*costMult*(insurance/100))/12,rentGrowth:effG,taxGrowthA:taxGrowth/100,insGrowthA:insGrowth/100,taxMarg:incomeTax/100,lossCarry,
         depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*grm,valueGrowth:growth/100,
         conMode:conIntMode,conRate:(rate+rateAdd+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
     };
@@ -1304,7 +1307,7 @@ function App(){
       {label:"Construction 25% over budget",costMult:1.25},
     ].map((sc,i)=>{const r=i===0?base:mk(sc);return{label:sc.label,cfPlus:r.cfPlus,cfAtTerm:r.cfAtTerm,po:r.po,ret:r.at(evalAt).tot}});
     return{base,stress};
-  },[loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,insBase,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,grm,growth]);
+  },[lossCarry,loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,insBase,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,grm,growth]);
   const M0=mdl.base;
   // The permanent-loan payment, including any construction interest added to the loan.
   const loanPmt=M0.pmt;
@@ -1419,7 +1422,7 @@ function App(){
         "Rent is the figure entered. The ADU's value is estimated at "+grm+"× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
         "The model runs month by month from project start."+(buildMonths>0?" During the "+buildMonths+"-month build there is no rent; funds are drawn on a standard construction schedule (soft costs up front, owner cash first, hard costs on an S-curve with 5% retention)"+(loanAmt>0?(conIntMode==="none"?". Construction interest is not charged in this scenario.":", with interest on the drawn balance."):"."):""),
         "Operating costs are vacancy, maintenance, management"+(hasSTR?", hosting":"")+", property tax and insurance, each escalating at the rates shown.",
-        incomeTax>0?"Income tax is applied at "+incomeTax+"% to rental income after "+(loanAmt>0?"loan interest and ":"")+"27.5-year depreciation of "+fD(depBasis)+" (furnishings excluded; construction interest capitalized). Passive-loss limits and depreciation recapture are not modeled.":"Income tax is not modeled; figures are pre-tax.",
+        incomeTax>0?"Income tax is applied at "+incomeTax+"% to rental income after "+(loanAmt>0?"loan interest and ":"")+"27.5-year depreciation of "+fD(depBasis)+" (furnishings excluded; construction interest capitalized)."+(lossCarry?" Early paper losses carry forward against later rental income.":" Early paper losses are ignored rather than carried forward.")+" Losses aren't deducted against other income.":"Income tax is not modeled; figures are pre-tax.",
         "Payback is when cumulative cash — down payment, construction interest and monthly cash flow — returns to zero. Annual returns are compound rates on the total project cost.",
         "Not included: solar (required on new California homes), landscaping restoration, HOA fees, refinancing, or the costs of selling.",
       ],
@@ -1573,6 +1576,7 @@ function App(){
             <TS label={<>Insurance ({fD(Math.round(insBase*insurance/100))}/yr)<IT align="left" text={"A rate on the building's replacement cost — the structure and foundation plus the builder's margin on them ("+fD(insBase)+"). Permits, fees, design, site work and furniture aren't part of dwelling coverage. Rate as a percentage of replacement cost is how insurers actually quote.\n\nLandlord policies (DP-3) run 15–25% above owner-occupied rates. Short-term rentals are excluded from standard and landlord policies — STR-specific coverage (Proper, Steadily, commercial) runs 2–3× landlord rates. Airbnb host protection is a supplement, not a replacement.\n\nCA wildfire-zone properties on the FAIR Plan can hit 1.5–2.5%."}/></>} value={insurance} onChange={set("insurance")} typeMin={LIM.insurance[0]} typeMax={LIM.insurance[1]} min={0.2} max={3.5} step={0.1} format={v=>v.toFixed(1)+"% of cost"} ticks={[{value:0.3,label:"HI / VT",color:gn},{value:0.45,label:"CA / PNW",color:tb},{value:0.65,label:"Natl avg",color:tk},{value:1.2,label:"TX / CO",color:yl},{value:1.8,label:"OK / KS / NE",color:yl},{value:2.8,label:"FL coastal",color:rd}]}/>
             <TS label="Insurance growth" value={insGrowth} onChange={set("insGrowth")} typeMin={LIM.insGrowth[0]} typeMax={LIM.insGrowth[1]} min={0} max={15} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:gn},{value:3,label:"Inflation",color:tk},{value:6,label:"Natl recent",color:tb},{value:10,label:"CA / FL",color:yl},{value:14,label:"Crisis",color:rd}]}/>
             <TS label={<>Marginal income tax rate<IT align="left" text={"Combined federal + state rate. Applied to taxable rental income after deducting loan interest and depreciation ("+fD(Math.round(depBasis/27.5))+"/yr).\n\nIn early years, deductions often exceed income — no tax owed. Tax grows as the loan amortizes and interest shrinks. Cov. and +/− are always pre-tax year-1."}/></>} value={incomeTax} onChange={set("incomeTax")} typeMin={LIM.incomeTax[0]} typeMax={LIM.incomeTax[1]} min={0} max={50} step={1} format={v=>v===0?"Not modeled":v+"%"} ticks={[{value:0,label:"Not modeled",color:gn},{value:22,label:"22% fed",color:tk},{value:32,label:"32% fed",color:tb},{value:37,label:"Top fed",color:yl},{value:46,label:"+CA state",color:rd}]}/>
+            {incomeTax>0&&<Tog on={lossCarry} onToggle={()=>set("lossCarry")(!lossCarry)} label={<>Carry rental losses forward<IT align="left" text={"In the early years, loan interest and depreciation usually make the ADU show a loss on paper even when cash comes in. Most owners can't deduct that loss against their salary (the passive-loss rules phase that out above $100K–$150K of income), but the loss isn't lost: it carries forward and offsets the ADU's rental income in later years, and anything left is deductible when you sell.\n\nTurn this off to see the more conservative case where early losses are simply ignored."}/></>} sub={lossCarry?"Early paper losses offset later rental income, lowering tax in later years":"Off — early paper losses are ignored (more conservative)"}/>}
           </div>
         </Section>
 
