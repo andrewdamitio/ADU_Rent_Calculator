@@ -179,7 +179,7 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,hookupCity:"ca",saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -195,7 +195,7 @@ function shareUrlFor(state){
 // value — is clamped to these. Cost lines go well past their sliders so a real quote always fits.
 const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],saleYear:[1,30],sellCost:[0,12],incomeTax:[0,50],customRent:[0,100000]};
 const INT_KEYS=new Set(["saleYear","trenchFt","term","strMonths","buildMonths","horizon"]);
-const ENUMS={projectType:Object.keys(PTYPES),siteMode:["facts","dollars"],fdn:["new","existing","none"],slope:["flat","gentle","moderate","steep"],soil:["known","unknown","clay","rock"],access:["open","side","tight"],demo:["none","small","structure"],panel:["room","full","small"],boundary:["needed","have"],rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
+const ENUMS={hookupCity:["ca","austin","denver","portland"],projectType:Object.keys(PTYPES),siteMode:["facts","dollars"],fdn:["new","existing","none"],slope:["flat","gentle","moderate","steep"],soil:["known","unknown","clay","rock"],access:["open","side","tight"],demo:["none","small","structure"],panel:["room","full","small"],boundary:["needed","have"],rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
 function cleanField(k,raw){
   const d=DEF[k];
   if(typeof d==="boolean")return raw===true||raw==="1"||raw==="true";
@@ -544,6 +544,9 @@ const SRC=[
 {t:"San Diego ADU Fee Waiver — Better Place",u:"https://betterplacedesignbuild.com/blog/san-diego-adu-fee-waiver/",n:"Specific waiver mechanics for SD baseline."},
 ]},
 {cat:"Water, Sewer & Electrical",links:[
+{t:"2026 System Development Charges — Denver Water",u:"https://www.denverwater.org/contractors/construction-information/system-development-charges/2026",n:"Official ADU water charge inside Denver ($2,055 Jan–Jun 2026, $2,170 from July 1, 2026) — the Denver tick on the water & sewer slider."},
+{t:"Rates and Fees (Impact Fees) — Austin Water",u:"https://www.austintexas.gov/water/rates-and-fees",n:"Official water and wastewater impact fees per service unit by plat date — the Austin ticks on the water & sewer slider."},
+{t:"ADU System Development Charge Waiver — City of Portland",u:"https://www.portland.gov/zh-hans/ppd/residential-permitting/adu-sdc-huomian",n:"Portland's waiver of system development charges for qualifying ADUs — the Portland tick on the water & sewer slider."},
 {t:"ADU Water, Sewer & Gas Connections — SnapADU",u:"https://snapadu.com/blog/guide-water-sewer-gas-connections-upgrades-for-adu/",n:"Hookup fee ranges by city; calibrates the $0–$30K water/sewer slider."},
 {t:"ADU Plumbing Cost Guide — Better Place",u:"https://betterplacedesignbuild.com/blog/adu-plumbing-cost/",n:"Plumbing trench/run lengths used for the +sewer-pump high-end tick."},
 {t:"Sewer Line Installation Cost 2026 — Angi",u:"https://www.angi.com/articles/how-much-does-installing-sewer-line-cost.htm",n:"National sewer-lateral cost benchmarks for non-CA metros."},
@@ -781,6 +784,22 @@ function PrintReport({rep}){
 // Typical all-in build cost per sq ft (structure, site work, fees, contingency and builder margin;
 // before any loan fee) by project type — rough 2025–2026 ranges, mostly from California builder
 // pricing in the sources. Used only as a sanity check, never in the math.
+// Tick marks for the water & sewer fee slider, by city. California is the original set; the other
+// cities are included only where the utility publishes the fee itself (sources in SRC).
+//  - Austin Water impact fees per service unit (water + wastewater), by plat date: about $800–1,100
+//    for central lots platted before 2007, $7,200 for 2018–2023 plats, $7,700 after Oct 1, 2023.
+//  - Denver Water's ADU system development charge (water only): $2,170 from July 1, 2026.
+//  - Portland waives system development charges for qualifying ADUs.
+const HOOKUP_TICKS={
+  ca:{label:"California",ticks:[{value:0,label:"Waived / incl.",color:gn},{value:4000,label:"San Diego",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:yl},{value:30000,label:"+lateral",color:rd}],
+    note:"California examples. ADUs under 750 sq ft are exempt from impact fees under state law; connection and capacity charges vary by utility."},
+  austin:{label:"Austin",ticks:[{value:1000,label:"Central lot (pre-2007)",color:gn},{value:7700,label:"Lot platted after 2023",color:yl}],
+    note:"Austin Water impact fees per service unit, water + wastewater, by when the lot was platted: about $800–$1,100 for central lots platted before 2007, $7,200 for 2018–2023, $7,700 after October 2023. Meter and inspection fees are extra, and Austin Water sets how many service units an ADU is assessed — confirm with them."},
+  denver:{label:"Denver",ticks:[{value:2170,label:"ADU water charge",color:tb}],
+    note:"Denver Water's system development charge for an ADU inside Denver: $2,170 from July 1, 2026 ($2,055 before). It covers water only; sewer connection charges are separate."},
+  portland:{label:"Portland",ticks:[{value:0,label:"SDCs waived",color:gn}],
+    note:"Portland waives system development charges for qualifying ADUs. Conditions apply — confirm eligibility with Portland Permitting & Development."},
+};
 const PSF_RANGE={detached:[350,600],prefab:[300,550],garage:[150,300],attached:[300,550],jadu:[100,250]};
 const WF_COLORS={dark:["#58a6ff","#3fb950","#a371f7","#d29922","#f0883e","#f85149"],light:["#2563eb","#16a34a","#7c3aed","#d97706","#ea580c","#dc2626"]};
 // "Where the money goes": each cost step as a bar starting where the previous one ended, then the
@@ -1262,7 +1281,7 @@ function App(){
   const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,...PTYPES[t].f,projectType:t}))},[]);
   // Switching to dollar amounts starts the sliders at what the site facts produced, so nothing jumps.
   const setSiteMode=useCallback(m=>{fromShareRef.current=false;setState(s=>m==="dollars"&&s.siteMode!=="dollars"?{...s,siteMode:m,...siteDollars(siteFromFacts(s,s.sqft))}:{...s,siteMode:m})},[]);
-  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,saleOn,saleYear,sellCost,incomeTax,lossCarry,firmOn,firm,customRent,customName,view}=state;
+  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,hookupCity,saleOn,saleYear,sellCost,incomeTax,lossCarry,firmOn,firm,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const ptype=PTYPES[projectType]||PTYPES.detached;
   // Site work: from the site facts, or the dollar sliders when the user prefers to enter amounts.
@@ -1533,7 +1552,14 @@ function App(){
           <SL>Fees & soft costs</SL>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <TS label={<>Permits, plan check & inspections<IT align="left" text={"Includes plan review and all construction inspections (foundation, framing, rough MEP, insulation, final/CO).\n\nRe-inspection fees if something fails are typically $100–$500 and come out of the builder's margin."}/></>} value={permits} onChange={set("permits")} box="Permits, plan check & inspections" typeMin={LIM.permits[0]} typeMax={LIM.permits[1]} min={0} max={30000} step={500} format={fD} ticks={[{value:3000,label:"Small / waived",color:gn},{value:7000,label:"Sacramento",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:rd}]}/>
-            <TS label="Water & sewer fees" value={hookup} onChange={set("hookup")} box="Water & sewer fees" typeMin={LIM.hookup[0]} typeMax={LIM.hookup[1]} min={0} max={60000} step={1000} format={fD} ticks={[{value:0,label:"Waived / incl.",color:gn},{value:4000,label:"San Diego",color:tk},{value:12000,label:"LA",color:tk},{value:20000,label:"SF",color:yl},{value:30000,label:"+lateral",color:rd}]}/>
+            <TS label={<>Water & sewer fees<IT align="left" text={HOOKUP_TICKS[hookupCity].note}/></>} value={hookup} onChange={set("hookup")} box="Water & sewer fees" typeMin={LIM.hookup[0]} typeMax={LIM.hookup[1]} min={0} max={60000} step={500} format={fD} ticks={HOOKUP_TICKS[hookupCity].ticks}/>
+            <div style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"#8b949e",marginTop:-2}}>
+              <label htmlFor="hookupCity">Tick marks for</label>
+              <select id="hookupCity" value={hookupCity} onChange={e=>set("hookupCity")(e.target.value)} style={{background:"#0d1117",color:"#c9d1d9",border:"1px solid #30363d",borderRadius:6,padding:"3px 6px",fontSize:11,fontFamily:"inherit"}}>
+                {Object.entries(HOOKUP_TICKS).map(([k,c])=><option key={k} value={k}>{c.label}</option>)}
+              </select>
+              <span style={{color:"#6e7681"}}>· from each utility's published fees</span>
+            </div>
             <TS label="Design & engineering" value={design} onChange={set("design")} box="Design & engineering" typeMin={LIM.design[0]} typeMax={LIM.design[1]} min={0} max={25000} step={500} format={fD} ticks={[{value:3000,label:"Pre-approved",color:gn},{value:10000,label:"Custom arch.",color:tk},{value:18000,label:"Bay Area",color:tk}]}/>
             {facts?(<div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"baseline"}}><div><div style={{fontSize:12,color:"#8b949e"}}>Surveys & reports</div><div style={{fontSize:11,color:"#6e7681"}}>From site facts: {sf.why.surveys}</div></div><span style={{fontSize:15,fontFamily:"'Fraunces',serif",fontWeight:600,color:"#e6edf3"}}>{surveys===0?"Not required":fD(surveys)}</span></div>):<TS label={<>Surveys & reports<IT align="left" text="A land survey confirms your property lines and where the ADU can legally sit. A soil report (geotechnical study) tells the engineer what kind of foundation the ground actually needs — required on many hillside or unstable-soil lots, skippable on a flat, already-documented one."/></>} value={surveys} onChange={set("surveys")} box="Surveys & reports" typeMin={LIM.surveys[0]} typeMax={LIM.surveys[1]} min={0} max={12000} step={500} format={v=>v===0?"Not required":fD(v)} ticks={[{value:0,label:"Not req'd",color:gn},{value:1500,label:"Survey only",color:tk},{value:3500,label:"Survey + soil",color:tb},{value:7000,label:"Full geotech",color:yl}]}/>}
             <TS label={<>Furnishing<IT align="left" text={(hasSTR?"Furniture, linens, kitchenware, decor — everything a guest needs. The range, dishwasher, and refrigerator are already in structure $/sqft.":"Washer/dryer, furniture, or other extras beyond what the builder installs. The range, dishwasher, and refrigerator are already in structure $/sqft. Set to $0 if tenant-supplied.")+"\n\nFurnishings are not depreciated with the building in this model. Expect to replace them every 5–7 years ("+(hasSTR?"sooner with heavy guest turnover":"sooner with hard use")+") — budget for that from the maintenance reserve."}/></>} value={furnishing} onChange={set("furnishing")} box="Furnishing" typeMin={LIM.furnishing[0]} typeMax={LIM.furnishing[1]} min={0} max={25000} step={1000} format={v=>v===0?"Unfurnished":fD(v)} ticks={hasSTR?[{value:0,label:"Unfurnished",color:gn},{value:5000,label:"Basic",color:tk},{value:10000,label:"Standard",color:tb},{value:18000,label:"Design-forward",color:yl}]:[{value:0,label:"Unfurnished",color:gn},{value:1500,label:"Washer/dryer",color:tk},{value:5000,label:"Partial",color:tb},{value:12000,label:"Fully furnished",color:yl}]}/>

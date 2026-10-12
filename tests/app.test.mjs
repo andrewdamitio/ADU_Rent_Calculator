@@ -240,6 +240,27 @@ describe("construction-period interest", () => {
   });
 });
 
+describe("water & sewer ticks by city", () => {
+  const row = t => t.match(/Water & sewer fees\?.*?Tick marks for/)[0];
+  test("California by default; each city swaps in its official figures", async () => {
+    assert.match(row((await load("?customRent=2600")).text()), /San Diego.*LA.*SF/);
+    const austin = row((await load("?customRent=2600&hookupCity=austin")).text());
+    assert.match(austin, /Central lot \(pre-2007\).*Lot platted after 2023/);
+    assert.doesNotMatch(austin, /San Diego/);
+    assert.match(row((await load("?customRent=2600&hookupCity=denver")).text()), /ADU water charge/);
+    assert.match(row((await load("?customRent=2600&hookupCity=portland")).text()), /SDCs waived/);
+  });
+  test("the picker is saved, a bad city falls back, and the sources are listed", async () => {
+    const p = await load("?customRent=2600");
+    const sel = p.doc.querySelector("#hookupCity");
+    sel.value = "denver"; sel.dispatchEvent(new p.w.Event("change", { bubbles: true })); await wait(60);
+    assert.equal(p.saved().hookupCity, "denver");
+    assert.match(row((await load("?customRent=2600&hookupCity=atlantis")).text()), /San Diego/);
+    await p.click("Sources & data provenance");
+    assert.match(p.text(), /2026 System Development Charges — Denver Water.*Rates and Fees \(Impact Fees\) — Austin Water.*ADU System Development Charge Waiver — City of Portland/);
+  });
+});
+
 describe("streamlined layout", () => {
   test("Summary: no duplicate post-loan card, no empty tax bar, net equity starts as one line", async () => {
     const p = await load("?customRent=2600&cashDown=20&view=consumer");
