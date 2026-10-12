@@ -32,7 +32,7 @@ const SIM_YEARS=50,DEP_MONTHS=330; // 27.5-year residential depreciation
 const RETENTION=0.05;
 function runModel(p){
   const{loanAmt,cashDown,annRate,termYr,buildMo,grossY1,collectPct,opPct,mPTY1,mInsY1,rentGrowth,taxGrowthA,insGrowthA,taxMarg,depBasis,valueY1,valueGrowth,
-    conMode="none",conRate=annRate,spendUp=0,spendEnd=0}=p;
+    conMode="none",conRate=annRate,spendUp=0,spendEnd=0,leaseUp=0}=p;
   const bm=buildMo||0,n=termYr*12,mr=annRate/12;
   const mg=x=>x>0?Math.pow(1+x,1/12)-1:0;
   const mrG=mg(rentGrowth),mtG=mg(taxGrowthA),miG=mg(insGrowthA),mvG=mg(valueGrowth);
@@ -64,7 +64,7 @@ function runModel(p){
         bal=drawn+capInt;pmt=cMP(bal,annRate,termYr);
         dep=(depBasis+capInt+conPaid)/27.5/12;
       }
-      const rent=grossY1*Math.pow(1+mrG,m),coll=rent*collectPct,opex=coll*opPct;
+      const rent=grossY1*Math.pow(1+mrG,m),coll=m<leaseUp?0:rent*collectPct,opex=coll*opPct;
       const pt=mPTY1*Math.pow(1+mtG,m),ins=mInsY1*Math.pow(1+miG,m);
       const noi=coll-opex-pt-ins;
       const inLoan=m<n&&bal>0.005;
@@ -695,11 +695,11 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     {/* STRESS TESTS */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:6}}>Stress tests</div>
-      <div style={{fontSize:12.5,color:LT.body,marginBottom:14}}>How adverse conditions would shift your time-to-positivity and payback:</div>
+      <div style={{fontSize:12.5,color:LT.body,marginBottom:14}}>How one thing going wrong would change your timeline and your return:</div>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
         <thead>
           <tr style={{borderBottom:"1px solid "+LT.border}}>
-            {["Scenario","Years to cash positive","Payback period"].map((h,i)=><th key={h} style={{textAlign:i?"right":"left",padding:"8px 4px",fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>{h}</th>)}
+            {["Scenario","Cash positive","Payback",loanAmt>0?"Return at payoff":"Return, yr "+cm.evalYrs].map((h,i)=><th key={h} style={{textAlign:i?"right":"left",padding:"8px 4px",verticalAlign:"bottom",fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>{h}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -707,10 +707,11 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
             <td style={{padding:"10px 4px",color:LT.text,fontWeight:isBase?600:500}}>{t.label}</td>
             <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:cfCol}}>{t.cfPlus<=0?"Day one":fYr(t.cfPlus)+(t.cfAtTerm?"*":"")}</td>
             <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:poCol}}>{t.po===0?"Immediate":fYr(t.po)}</td>
+            <td style={{padding:"10px 4px",textAlign:"right",fontFamily:"'Fraunces',serif",fontWeight:600,color:t.ret>=0?LT.pos:LT.neg,whiteSpace:"nowrap"}}>{(t.ret>=0?"+":"")+fK2(t.ret)}{!isBase&&<div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,fontWeight:500,color:LT.muted}}>{(t.ret-cm.stress[0].ret>=0?"+":"−")+fK2(Math.abs(t.ret-cm.stress[0].ret))}</div>}</td>
           </tr>)})}
         </tbody>
       </table>
-      <div style={{fontSize:12,color:LT.muted,marginTop:14,lineHeight:1.5}}>"Years to cash positive" is when monthly cash flow after the loan payment{taxNote} turns positive{cm.stress.some(t=>t.cfAtTerm)?" (* = only once the loan is paid off)":""}. "Payback period" is when you've gotten back everything you put in. Each stress holds other assumptions constant; rent shortfalls and cost overruns of 15–25% are the most common surprises in published ADU projects.</div>
+      <div style={{fontSize:12,color:LT.muted,marginTop:14,lineHeight:1.5}}>"Cash positive" is when monthly cash flow after the loan payment{taxNote} turns positive{cm.stress.some(t=>t.cfAtTerm)?" (* = only once the loan is paid off)":""}. "Payback" is when you've gotten back everything you put in. The small figure under each return is the change from the base case. Each test changes one assumption and holds the rest; rent shortfalls and cost overruns of 15–25% are the most common surprises in published ADU projects{loanAmt>0?", and HELOC rates are variable":""}.</div>
     </div>
     </>);})()}
 
@@ -813,20 +814,28 @@ function App(){
   const effG=(growth*(1-stF)+strGrowth*stF)/100;
   const mPT=(assetCost*(taxRate/100))/12,mIns=(assetCost*(insurance/100))/12;
 
-  // Every result on the page comes from runModel. Stress tests rerun it with rent or cost shocks.
+  // Every result on the page comes from runModel. Stress tests rerun it with one assumption shocked.
   const mdl=useMemo(()=>{
-    const mk=(rentMult,costMult)=>{
+    const mk=({rentMult=1,costMult=1,rateAdd=0,leaseUp=0}={})=>{
       const aC=assetCost*costMult,tot=aC+(origFeeOn?Math.round(aC*(origFee/100)):0),down=Math.round(tot*(cashDown/100));
-      return runModel({loanAmt:tot-down,cashDown:down,annRate:rate/100,termYr:term,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
+      return runModel({loanAmt:tot-down,cashDown:down,annRate:(rate+rateAdd)/100,termYr:term,leaseUp,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
         mPTY1:(aC*(taxRate/100))/12,mInsY1:(aC*(insurance/100))/12,rentGrowth:effG,taxGrowthA:taxGrowth/100,insGrowthA:insGrowth/100,taxMarg:incomeTax/100,
         depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*110,valueGrowth:growth/100,
-        conMode:conIntMode,conRate:(rate+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
+        conMode:conIntMode,conRate:(rate+rateAdd+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
     };
-    const base=mk(1,1);
-    const stress=[["Base case",1,1],["Rent 10% below estimate",0.9,1],["Rent 20% below estimate",0.8,1],["Construction 15% over budget",1,1.15],["Construction 25% over budget",1,1.25]]
-      .map(([label,r,c])=>{const s=r===1&&c===1?base:mk(r,c);return{label,cfPlus:s.cfPlus,cfAtTerm:s.cfAtTerm,po:s.po}});
+    const base=mk();
+    const evalAt=buildMonths+(loanAmt>0?term:horizon)*12;
+    const stress=[
+      {label:"Base case"},
+      {label:"Rent 10% below estimate",rentMult:0.9},
+      {label:"Rent 20% below estimate",rentMult:0.8},
+      {label:"First 3 months vacant",leaseUp:3},
+      ...(loanAmt>0?[{label:"Loan rate 1% higher",rateAdd:1}]:[]),
+      {label:"Construction 15% over budget",costMult:1.15},
+      {label:"Construction 25% over budget",costMult:1.25},
+    ].map((sc,i)=>{const r=i===0?base:mk(sc);return{label:sc.label,cfPlus:r.cfPlus,cfAtTerm:r.cfAtTerm,po:r.po,ret:r.at(evalAt).tot}});
     return{base,stress};
-  },[assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,growth]);
+  },[loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,growth]);
   const M0=mdl.base;
   // The permanent-loan payment, including any construction interest added to the loan.
   const loanPmt=M0.pmt;

@@ -218,6 +218,24 @@ describe("consumer summary", () => {
   });
 });
 
+describe("stress tests", () => {
+  const rows = p => [...p.doc.querySelectorAll("table tbody tr")].map(tr => {
+    const td = [...tr.querySelectorAll("td")];
+    return { label: td[0].textContent, payback: parseFloat(td[2].textContent), ret: money(td[3].firstChild.textContent) * (/k$/.test(td[3].firstChild.textContent) ? 1000 : 1) };
+  });
+  test("cover rate, lease-up, rent and cost shocks, each worse than the base case", async () => {
+    const r = rows(await load("?customRent=2600&cashDown=20&view=consumer"));
+    assert.deepEqual(r.map(x => x.label), ["Base case", "Rent 10% below estimate", "Rent 20% below estimate", "First 3 months vacant", "Loan rate 1% higher", "Construction 15% over budget", "Construction 25% over budget"]);
+    for (const x of r.slice(1)) assert.ok(x.ret < r[0].ret, x.label + " lowers the return");
+    assert.ok(r[4].payback > r[0].payback, "higher rate delays payback");
+  });
+  test("all-cash projects skip the loan-rate test", async () => {
+    const r = rows(await load("?customRent=2600&cashDown=100&view=consumer"));
+    assert.ok(!r.some(x => /Loan rate/.test(x.label)));
+    assert.equal(r.length, 6);
+  });
+});
+
 describe("all-cash consumer view", () => {
   test("hides loan-only cards and offers a horizon instead", async () => {
     const t = (await load("?customRent=2600&cashDown=100&view=consumer")).text();
