@@ -388,6 +388,21 @@ describe("what if you sold", () => {
     const f = (await load("?customRent=2600&sellCost=4")).text();
     assert.match(f, /Value & selling.*Selling costs.*4% of sale.*Sell after.*10 years of renting.*If sold then: about \$[\d,]+ from the sale/);
   });
+  test("can be turned off: no card, no selling settings, no report note", async () => {
+    const c = await load("?customRent=2600&saleOn=0&view=consumer");
+    assert.doesNotMatch(c.text(), /What if you sold\?/);
+    assert.doesNotMatch(c.report().textContent, /If sold after/);
+    const f = (await load("?customRent=2600&saleOn=0")).text();
+    assert.match(f, /Include a sale scenarioOff — for owners who plan to keep the ADU/);
+    assert.doesNotMatch(f, /Selling costs|Sell after/);
+    assert.match(f, /Value multiplier/, "the ADU's value still counts");
+  });
+  test("a homeowner can hide the card from the Summary", async () => {
+    const p = await load("?customRent=2600&view=consumer");
+    await p.click("Not planning to sell? Hide this");
+    assert.doesNotMatch(p.text(), /What if you sold\?/);
+    assert.equal(p.saved().saleOn, false);
+  });
   test("the report includes the sale scenario", async () => {
     assert.match((await load("?customRent=2600&saleYear=12")).report().textContent, /If sold after 12 years of renting: .* leaves \$[\d,]+ — a net gain of/);
   });
