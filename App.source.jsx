@@ -384,8 +384,8 @@ function Fact({label,help,children}){
 const opts=pairs=>pairs.map(([value,label])=>({value,label}));
 // The site-facts questionnaire and the dollar amounts it produces, each with the reason.
 function SiteFacts({s,set,sf}){
-  const isNew=s.fdn==="new",inside=s.fdn==="none";
-  return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+  const isNew=s.fdn==="new",inside=s.fdn==="none";const wide={gridColumn:"1 / -1"};
+  return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,260px),1fr))",gap:"14px 20px",alignItems:"start"}}>
     <Fact label="Foundation"><ModePills label="Foundation" value={s.fdn} onChange={set("fdn")} options={opts([["new","New"],["existing","Existing slab"],["none","None (inside house)"]])}/></Fact>
     {isNew&&<Fact label="Lot slope" help={"Gentle: under about 5%. Moderate: 5–15% — usually a raised foundation. Steep: over 15% — an engineered hillside foundation and a full geotechnical report."}>
       <ModePills label="Lot slope" value={s.slope} onChange={set("slope")} options={opts([["flat","Flat"],["gentle","Gentle"],["moderate","Moderate"],["steep","Steep"]])}/></Fact>}
@@ -395,7 +395,7 @@ function SiteFacts({s,set,sf}){
       <ModePills label="Equipment access" value={s.access} onChange={set("access")} options={opts([["open","Open"],["side","Side yard"],["tight","Tight"]])}/></Fact>}
     {isNew&&<Tog on={s.crane} onToggle={()=>set("crane")(!s.crane)} label="Crane set" sub="Prefab and modular units are lifted into place — about $6,000"/>}
     {!inside&&<Fact label="Demolition"><ModePills label="Demolition" value={s.demo} onChange={set("demo")} options={opts([["none","None"],["small","Shed or patio"],["structure","Existing building"]])}/></Fact>}
-    {!inside&&<TS label={<>Distance to utility connections<IT align="left" text={"How far the trench runs from the house's water, sewer and electrical connections to the ADU. One shared trench is typical, at roughly $100 per foot."}/></>} value={s.trenchFt} onChange={set("trenchFt")} typeMin={0} typeMax={1000} min={0} max={300} step={10} format={v=>v+" ft"} ticks={[{value:30,label:"Close",color:gn},{value:80,label:"Typical",color:tb},{value:150,label:"Far",color:yl},{value:250,label:"Very far",color:rd}]}/>}
+    {!inside&&<div style={wide}><TS label={<>Distance to utility connections<IT align="left" text={"How far the trench runs from the house's water, sewer and electrical connections to the ADU. One shared trench is typical, at roughly $100 per foot."}/></>} value={s.trenchFt} onChange={set("trenchFt")} typeMin={0} typeMax={1000} min={0} max={300} step={10} format={v=>v+" ft"} ticks={[{value:30,label:"Close",color:gn},{value:80,label:"Typical",color:tb},{value:150,label:"Far",color:yl},{value:250,label:"Very far",color:rd}]}/></div>}
     {!inside&&<Fact label="Sewer" help={"If the ADU sits lower than the sewer connection, waste has to be pumped up with an ejector pump — about $8,000 installed."}>
       <ModePills label="Sewer" value={s.sewerPump?"pump":"gravity"} onChange={v=>set("sewerPump")(v==="pump")} options={opts([["gravity","Flows by gravity"],["pump","Needs a pump"]])}/></Fact>}
     {!inside&&<Tog on={s.gasLine} onToggle={()=>set("gasLine")(!s.gasLine)} label="Gas line to the ADU" sub="Adds about $20 per foot to the trench"/>}
@@ -403,7 +403,7 @@ function SiteFacts({s,set,sf}){
       <ModePills label="Existing electrical panel" value={s.panel} onChange={set("panel")} options={opts([["room","200A, has space"],["full","200A, full"],["small","100–150A"]])}/></Fact>
     <Tog on={s.allElectric} onToggle={()=>set("allElectric")(!s.allElectric)} label="All-electric ADU" sub="Heat pump and induction cooking need more panel capacity"/>
     <Fact label="Boundary survey"><ModePills label="Boundary survey" value={s.boundary} onChange={set("boundary")} options={opts([["needed","Needed"],["have","Have a recent one"]])}/></Fact>
-    <div style={{border:"1px solid #21262d",borderRadius:8,padding:"6px 12px",background:"#0d1117"}}>
+    <div style={{...wide,border:"1px solid #21262d",borderRadius:8,padding:"6px 12px",background:"#0d1117"}}>
       {[["Foundation","foundation"],["Grading, demo & access","sitePrep"],["Utility trenching","utilTrench"],["Electrical","electrical"],["Surveys & reports","surveys"]].map(([l,k],i)=>(
         <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"7px 0",borderTop:i?"1px solid #21262d":"none"}}>
           <div style={{minWidth:0}}><div style={{fontSize:12.5,color:"#c9d1d9"}}>{l}{k==="surveys"&&<span style={{fontSize:11,color:"#6e7681"}}> (counted in soft costs)</span>}</div><div style={{fontSize:11,color:"#8b949e",lineHeight:1.4}}>{sf.why[k]}</div></div>
@@ -823,7 +823,7 @@ const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
 function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
-  const[barYear,setBarYear]=useState(1);
+  const[barYear,setBarYear]=useState(1);const[showParts,setShowParts]=useState(false);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
 
@@ -930,7 +930,7 @@ function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,u
           </div>)})}
       </div>
       <div style={{fontSize:13,color:LT.body,lineHeight:1.6,textAlign:"center"}}>
-        Your net position at each point: estimated ADU value, minus any remaining loan, plus cumulative after-tax cash flow, minus your down payment{growth>0?" — with "+growth+"%/yr rent growth":""}. %/yr is the compound annual return on the {fD(total)} project cost. {timeNote}
+        What you'd be ahead by at each point: the ADU's value, minus any loan left, plus the after-tax cash it has made, minus your down payment. %/yr is compound on the {fD(total)} project cost{buildMonths>0?"; years count from the start of the "+buildMonths+"-month build":""}.
       </div>
     </div>
 
@@ -991,13 +991,13 @@ function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,u
             </div>
             <div style={track}><div style={{height:"100%",background:LT.warn,borderRadius:6,width:`${(totalExp/maxBar)*100}%`,transition:"width 0.3s",opacity:0.8}}/></div>
           </div>
-          <div style={{opacity:taxActive?1:0.4}}>
+          {taxActive&&<div>
             <div style={rowL}>
               <span style={{fontSize:12.5,color:taxActive?LT.body:LT.muted}}>Income tax <span style={{fontSize:11,color:LT.muted}}>{taxActive?"("+incomeTax+"% marginal rate)":"(not modeled — set a rate in the Full model)"}</span></span>
               <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:taxActive?LT.neg:LT.muted,whiteSpace:"nowrap"}}>{taxActive?"−"+fD(b.incomeTax)+"/mo":"$0"}</span>
             </div>
             <div style={track}><div style={{height:"100%",background:taxActive?"#ef4444":"#cbd5e1",borderRadius:6,width:taxActive?`${(b.incomeTax/maxBar)*100}%`:"0%",transition:"width 0.3s",opacity:0.7}}/></div>
-          </div>
+          </div>}
         </div>
         <div style={{marginTop:12,padding:"10px 14px",borderRadius:8,background:netPos?LT.posBg:LT.warnBg,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <div>
@@ -1083,7 +1083,7 @@ function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,u
       <div style={{...secH,marginBottom:4}}>Net equity position over time</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Total wealth created by the ADU at any point — asset value <strong style={{color:LT.info}}>minus</strong> remaining loan balance <strong style={{color:LT.info}}>plus</strong> your cash position. After the loan is paid off, the payment becomes income and growth accelerates.</div>
       <TimeChart pts={cm.pts} height={250} ariaLabel="Net equity, ADU value, loan balance and cash position by year"
-        series={[{key:"tot",color:"#2563eb",width:3},{key:"value",color:"#d97706",dash:"2,4",opacity:0.6},{key:"loanNeg",color:"#ef4444",dash:"4,3",opacity:0.5},{key:"cash",color:"#16a34a",dash:"4,3",opacity:0.55}]}
+        series={[{key:"tot",color:"#2563eb",width:3},...(showParts?[{key:"value",color:"#d97706",dash:"2,4",opacity:0.6},{key:"loanNeg",color:"#ef4444",dash:"4,3",opacity:0.5},{key:"cash",color:"#16a34a",dash:"4,3",opacity:0.55}]:[])]}
         area={{pos:"#2563eb",neg:"#2563eb"}}
         vlines={loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]}
         tooltip={p=>{const row=(l,v,c)=>(<div style={{display:"flex",justifyContent:"space-between",gap:12,marginBottom:2}}><span style={{color:"#94a3b8",fontSize:12}}>{l}</span><span style={{fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:600,color:c}}>{v}</span></div>);return(<>
@@ -1096,23 +1096,12 @@ function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,u
             <span style={{fontFamily:"'Fraunces',serif",fontSize:14,fontWeight:700,color:"#60a5fa"}}>{p.tot>=0?"+":""}{fD(p.tot)}</span>
           </div>
         </>)}}/>
-      <div style={{display:"flex",gap:16,marginTop:10,fontSize:12,color:LT.muted,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:16,marginTop:10,fontSize:12,color:LT.muted,flexWrap:"wrap",alignItems:"center"}}>
         <span><span style={{display:"inline-block",width:20,height:3,background:"#2563eb",borderRadius:2,verticalAlign:"middle",marginRight:5}}/>Net equity</span>
-        <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dotted #d97706",verticalAlign:"middle",marginRight:5}}/>ADU value</span>
+        {showParts&&<><span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dotted #d97706",verticalAlign:"middle",marginRight:5}}/>ADU value</span>
         <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dashed #ef4444",verticalAlign:"middle",marginRight:5}}/>Loan balance</span>
-        <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dashed #16a34a",verticalAlign:"middle",marginRight:5}}/>Cash position</span>
-      </div>
-    </div>
-
-    {/* LIFE AFTER THE LOAN */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20,background:post.net>=0?"linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)":LT.warnBg,border:"1px solid "+(post.net>=0?"#bbf7d0":"#fde68a")}}>
-      <div style={{fontSize:11,color:post.net>=0?LT.pos:LT.warn,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:10}}>{loanAmt>0?"Life after the loan — rental year "+(term+1)+" onward":"Income in rental year "+cm.evalYrs}</div>
-      <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap",marginBottom:10}}>
-        <div style={{fontFamily:"'Fraunces',serif",fontSize:38,fontWeight:700,color:post.net>=0?LT.pos:LT.warn,lineHeight:1}}>{fD(post.net)}/mo</div>
-        <div style={{fontSize:15,color:post.net>=0?"#166534":LT.body}}>= <strong>{fD(post.net*12)}/yr</strong>{post.net>=0?" in passive income":""}</div>
-      </div>
-      <div style={{fontSize:13,color:post.net>=0?"#166534":LT.body,lineHeight:1.6}}>
-        That's net of property tax, insurance, maintenance, vacancy{incomeTax>0?", and income tax at "+incomeTax+"% (which rises once there's no loan interest to deduct)":""}{loanAmt>0?", with no loan payment":""}. It keeps growing with rent for as long as you own the property.
+        <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dashed #16a34a",verticalAlign:"middle",marginRight:5}}/>Cash position</span></>}
+        <button type="button" className="no-print" onClick={()=>setShowParts(v=>!v)} style={{marginLeft:"auto",background:"none",border:"none",padding:0,color:LT.info,fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}}>{showParts?"Hide the parts":"Show what makes it up"}</button>
       </div>
     </div>
 
@@ -1243,7 +1232,7 @@ function App(){
     try{const raw=store.get(SK);if(raw)return{state:{...DEF,...cleanState(JSON.parse(raw)),view:"internal"},shared:false}}catch(e){}
     return{state:DEF,shared:false};
   });
-  const[state,setState]=useState(init.state);const[showSources,setShowSources]=useState(false);const[copied,setCopied]=useState(false);const[confirmReset,setConfirmReset]=useState(false);
+  const[state,setState]=useState(init.state);const[showSources,setShowSources]=useState(false);const[showHow,setShowHow]=useState(false);const[copied,setCopied]=useState(false);const[confirmReset,setConfirmReset]=useState(false);
   const[openSec,setOpenSec]=useState({costs:true,financing:true,revenue:true,taxes:true,value:true});
   const toggleSec=k=>setOpenSec(s=>({...s,[k]:!s[k]}));
   const resetTimerRef=useRef(null);
@@ -1329,12 +1318,12 @@ function App(){
 
   // Every result on the page comes from runModel. Stress tests rerun it with one assumption shocked.
   const mdl=useMemo(()=>{
-    const mk=({rentMult=1,costMult=1,rateAdd=0,leaseUp=0}={})=>{
+    const mk=({rentMult=1,costMult=1,rateAdd=0,leaseUp=0,conMode=conIntMode}={})=>{
       const aC=assetCost*costMult,tot=aC+(origFeeOn?Math.round(aC*(origFee/100)):0),down=Math.round(tot*(cashDown/100));
       return runModel({loanAmt:tot-down,cashDown:down,annRate:(rate+rateAdd)/100,termYr:term,leaseUp,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
         mPTY1:(aC*(taxRate/100))/12,mInsY1:(insBase*costMult*(insurance/100))/12,rentGrowth:effG,taxGrowthA:taxGrowth/100,insGrowthA:insGrowth/100,taxMarg:incomeTax/100,lossCarry,
         depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*grm,valueGrowth:growth/100,
-        conMode:conIntMode,conRate:(rate+rateAdd+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
+        conMode,conRate:(rate+rateAdd+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
     };
     const base=mk();
     const evalAt=buildMonths+(loanAmt>0?term:horizon)*12;
@@ -1347,7 +1336,9 @@ function App(){
       {label:"Construction 15% over budget",costMult:1.15},
       {label:"Construction 25% over budget",costMult:1.25},
     ].map((sc,i)=>{const r=i===0?base:mk(sc);return{label:sc.label,cfPlus:r.cfPlus,cfAtTerm:r.cfAtTerm,po:r.po,ret:r.at(evalAt).tot}});
-    return{base,stress};
+    // Each construction-interest option, so the choice can show what it means in dollars.
+    const conAlt=loanAmt>0&&buildMonths>0?Object.fromEntries(["paid","cap","none"].map(m=>[m,m===conIntMode?base:mk({conMode:m})])):null;
+    return{base,stress,conAlt};
   },[lossCarry,loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,insBase,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,grm,growth]);
   const M0=mdl.base;
   // The permanent-loan payment, including any construction interest added to the loan.
@@ -1402,7 +1393,7 @@ function App(){
       // 25%, and only up to the actual gain), plus the tax value of any carried-forward losses,
       // which become deductible on a sale. Added to the cash position for the net gain.
       sale:(()=>{
-        const k=buildMonths+saleYear*12,sn=M0.at(k),tx=incomeTax/100;
+        const k=buildMonths+saleYear*12,sn0=M0.at(k),sn={...sn0,bal:sn0.bal<1?0:sn0.bal},tx=incomeTax/100; // a sub-dollar balance is paid off
         const costs=sn.value*sellCost/100,netPrice=sn.value-costs;
         const gain=Math.max(0,netPrice-(M0.basisTotal-sn.depTaken));
         const recaptured=tx>0?Math.min(sn.depTaken,gain):0,recapture=recaptured*Math.min(tx,0.25);
@@ -1549,21 +1540,21 @@ function App(){
             <Sub label="Soft cost subtotal" value={softCostBase}/>
           </div>
 
-          <SL>Contingency</SL>
-          <TS label={<>Contingency<IT align="left" text={"Percentage of hard costs (structure + site work) set aside for unforeseen items — buried utilities, soil surprises, permit re-inspections, landscaping restoration.\n\n5% is standard for straightforward builds; 10–15% for complex sites or older neighborhoods with unknown infrastructure.\n\nTurn on Budget confidence below to get a contingency suggested from how firm each cost is."}/></>} value={contingency} onChange={set("contingency")} typeMin={LIM.contingency[0]} typeMax={LIM.contingency[1]} min={0} max={20} step={1} format={v=>v===0?"None":v+"% ("+fD(contingencyAmt)+")"} ticks={[{value:0,label:"None",color:gn},{value:5,label:"Typical",color:tb},{value:10,label:"Complex",color:tk},{value:15,label:"High risk",color:yl}]}/>
+          <SL>Contingency & builder margin</SL>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <TS label={<>Contingency<IT align="left" text={"Percentage of hard costs (structure + site work) set aside for unforeseen items — buried utilities, soil surprises, permit re-inspections, landscaping restoration.\n\n5% is standard for straightforward builds; 10–15% for complex sites or older neighborhoods with unknown infrastructure.\n\nTurn on Budget confidence below to get a contingency suggested from how firm each cost is."}/></>} value={contingency} onChange={set("contingency")} typeMin={LIM.contingency[0]} typeMax={LIM.contingency[1]} min={0} max={20} step={1} format={v=>v===0?"None":v+"% ("+fD(contingencyAmt)+")"} ticks={[{value:0,label:"None",color:gn},{value:5,label:"Typical",color:tb},{value:10,label:"Complex",color:tk},{value:15,label:"High risk",color:yl}]}/>
+            <TS label={<>Markup on project<IT align="left" text="The general contractor's profit and overhead on top of raw materials and labor — it's how a builder stays in business, covers insurance, permits paperwork, and project management, and absorbs the risk of things going wrong. 0% (owner-builder) means you're acting as your own GC and only paying subcontractors directly."/></>} value={markup} onChange={set("markup")} typeMin={LIM.markup[0]} typeMax={LIM.markup[1]} min={0} max={40} step={1} format={v=>v===0?"Owner-builder":v+"% ("+fD(markupAmt)+")"} ticks={[{value:0,label:"Owner-builder",color:gn},{value:10,label:"Prefab co.",color:tb},{value:20,label:"Typical GC",color:tk},{value:25,label:"Design-build",color:yl},{value:35,label:"Premium",color:rd}]}/>
+            {origFeeOn&&origFeeAmt>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 1px",borderTop:"1px solid #21262d",marginTop:6}}><span style={{fontSize:11.5,color:yl}}>+ Dealer fee ({origFee}%)</span><span style={{fontSize:13,fontFamily:"'Fraunces',serif",fontWeight:600,color:yl}}>{fD(origFeeAmt)}</span></div>}
+          </div>
 
           <SL>Budget confidence</SL>
           <BudgetConfidence on={firmOn} onToggle={()=>set("firmOn")(!firmOn)} firm={firm} setFirm={set("firm")} bc={bc} contingency={contingency} setContingency={set("contingency")}/>
 
-          <SL>Builder / GC margin</SL>
-          <TS label={<>Markup on project<IT align="left" text="The general contractor's profit and overhead on top of raw materials and labor — it's how a builder stays in business, covers insurance, permits paperwork, and project management, and absorbs the risk of things going wrong. 0% (owner-builder) means you're acting as your own GC and only paying subcontractors directly."/></>} value={markup} onChange={set("markup")} typeMin={LIM.markup[0]} typeMax={LIM.markup[1]} min={0} max={40} step={1} format={v=>v===0?"Owner-builder":v+"% ("+fD(markupAmt)+")"} ticks={[{value:0,label:"Owner-builder",color:gn},{value:10,label:"Prefab co.",color:tb},{value:20,label:"Typical GC",color:tk},{value:25,label:"Design-build",color:yl},{value:35,label:"Premium",color:rd}]}/>
-          {origFeeOn&&origFeeAmt>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 1px",borderTop:"1px solid #21262d",marginTop:6}}><span style={{fontSize:11.5,color:yl}}>+ Dealer fee ({origFee}%)</span><span style={{fontSize:13,fontFamily:"'Fraunces',serif",fontWeight:600,color:yl}}>{fD(origFeeAmt)}</span></div>}
+          <SL>Build time</SL>
+          <TS label={<>Construction period<IT align="left" text={"Months from permit approval to first rent check. Regular loan payments start when the ADU is finished; until then there's no rent, and interest on the funds drawn so far is set below.\n\nAll results are measured from project start, so a longer build pushes every result "+buildMonths+" months later."}/></>} value={buildMonths} onChange={set("buildMonths")} typeMin={LIM.buildMonths[0]} typeMax={LIM.buildMonths[1]} min={0} max={18} step={1} format={v=>v===0?"None (already built)":v+" months"} ticks={[{value:0,label:"Already built",color:gn},{value:4,label:"Prefab",color:tb},{value:6,label:"Typical",color:tk},{value:10,label:"Stick-built",color:yl},{value:15,label:"+permit delays",color:rd}]}/>
 
           <SL>Where the money goes</SL>
           <CostWaterfall dark steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={projectType} typeNoun={ptype.noun}/>
-
-          <SL>Build time</SL>
-          <TS label={<>Construction period<IT align="left" text={"Months from permit approval to first rent check. Regular loan payments start when the ADU is finished; until then there's no rent, and interest on the funds drawn so far is set below.\n\nAll results are measured from project start, so a longer build pushes every result "+buildMonths+" months later."}/></>} value={buildMonths} onChange={set("buildMonths")} typeMin={LIM.buildMonths[0]} typeMax={LIM.buildMonths[1]} min={0} max={18} step={1} format={v=>v===0?"None (already built)":v+" months"} ticks={[{value:0,label:"Already built",color:gn},{value:4,label:"Prefab",color:tb},{value:6,label:"Typical",color:tk},{value:10,label:"Stick-built",color:yl},{value:15,label:"+permit delays",color:rd}]}/>
         </Section>
 
         {/* 2. FINANCING */}
@@ -1585,18 +1576,22 @@ function App(){
             <div style={{borderTop:"1px solid #21262d",marginTop:10,paddingTop:8}}>
               {loanAmt>0&&buildMonths>0&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
                 <div style={{fontSize:12,color:"#8b949e"}}>Interest during construction<IT align="left" text={"How construction financing works in this model:\n\nDesign, permits, utility fees and surveys are paid at the start. Your cash goes in first — lenders require it before they fund anything. The lender then funds the rest in monthly draws as work is completed and inspected, following the typical S-curve (slow start, fast framing and rough-in, slow finish work). 5% retention is held back until completion, and furnishings are bought at the end.\n\nYou pay interest only on what's been drawn, so the average balance during the build is typically 40–55% of the loan.\n\nHELOCs and most construction-to-permanent loans bill that interest monthly. Some lenders add it to the loan instead, which raises the permanent payment.\n\nFor taxes, construction interest is capitalized into the building's depreciation basis rather than deducted."}/></div>
-                <ModePills label="Interest during construction" value={conIntMode} onChange={set("conIntMode")} options={[{value:"paid",label:"Paid monthly"},{value:"cap",label:"Added to loan"},{value:"none",label:"Not charged"}]}/>
+                {(()=>{const A=mdl.conAlt,P=A.paid,C=A.cap,extra=C.pmt*term*12-(P.pmt*term*12+P.conPaid);return(
+                <MethodSwitch label="Interest during construction" value={conIntMode} onChange={set("conIntMode")} options={[
+                  {value:"paid",label:"Paid monthly",desc:"You pay about "+fD(P.conPaid)+" in interest-only bills during the build, then "+fD(P.pmt)+"/mo. Usual for HELOCs and construction-to-permanent loans."},
+                  {value:"cap",label:"Added to the loan",desc:"Nothing to pay during the build. The loan grows by "+fD(C.conCap)+", so the payment is "+fD(C.pmt)+"/mo — about "+fD(extra)+" more over the loan, as you pay interest on that interest."},
+                  {value:"none",label:"Not charged",desc:"Only realistic if the builder or a grant carries the financing until the ADU is finished."}]}/>)})()}
                 {conIntMode!=="none"&&<TS label={<>Construction-phase rate<IT align="left" text={"Extra interest charged during the build, on top of the "+rate.toFixed(1)+"% loan rate.\n\nHELOCs keep the same rate. Construction-to-permanent loans often price the build phase 0.5–1% higher; standalone bank construction loans 1–2% higher; private/hard-money lenders more."}/></>} value={conPremium} onChange={set("conPremium")} typeMin={LIM.conPremium[0]} typeMax={LIM.conPremium[1]} min={0} max={3} step={0.25} format={v=>v===0?"Same as loan ("+rate.toFixed(1)+"%)":"+"+v+"% ("+(rate+v).toFixed(2)+"%)"} ticks={[{value:0,label:"HELOC",color:gn},{value:0.75,label:"Constr.-to-perm",color:tb},{value:1.5,label:"Bank constr.",color:tk},{value:3,label:"Private lender",color:rd}]}/>}
-                <div style={{fontSize:11,color:conIntMode==="none"?yl:tb,lineHeight:1.45}}>{conIntMode==="none"?"No construction interest — only realistic if the builder or a grant carries the financing until completion.":"About "+fD(M0.conInterest)+" of interest over the "+buildMonths+"-month build, on an average drawn balance of "+fD(M0.conAvgDrawn)+". "+(conIntMode==="paid"?"Paid out of pocket as interest-only payments before rent starts.":"Added to the loan at completion, raising the monthly payment to "+fD(loanPmt)+".")}</div>
+                <div style={{fontSize:11,color:"#8b949e",lineHeight:1.45}}>Interest is charged only on what's been drawn — an average of {fD(M0.conAvgDrawn)} over the {buildMonths}-month build. Which option applies is usually set by the lender.</div>
               </div>)}
             </div>
           </div>
-        </Section>
-        <div style={{...card,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10,fontSize:12,color:"#8b949e",padding:"12px 18px",marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10,fontSize:12,color:"#8b949e",marginTop:14,paddingTop:10,borderTop:"1px solid #21262d"}}>
           <span>Monthly payment: <strong style={{color:"#e6edf3"}}>{loanAmt>0?fD(loanPmt)+"/mo":"$0 (all cash)"}</strong></span>
           <span>{loanAmt>0?"Total repaid: ":"Cash invested: "}<strong style={{color:"#e6edf3"}}>{loanAmt>0?fD(loanPmt*term*12):fD(total)}</strong>{cashDown>0&&loanAmt>0&&<span> + {fD(cashDownAmt)} cash</span>}</span>
           {M0.conInterest>0&&<span>Construction interest: <strong style={{color:"#e6edf3"}}>{fD(M0.conInterest)}</strong> {conIntMode==="paid"?"(paid during build)":"(in the loan)"}</span>}
-        </div>
+          </div>
+        </Section>
 
         {/* 3. REVENUE — what the unit brings in, and what comes off the top of the rent */}
         <Section title="Revenue" open={openSec.revenue} onToggle={()=>toggleSec("revenue")} summary={<><span style={{fontSize:12,color:"#8b949e"}}>{isLTR?"Long-term":isHybrid?"Seasonal hybrid":"Short-term · $"+strADR+"/night"} · </span><span style={{fontSize:openSec.revenue?18:15,fontFamily:"'Fraunces',serif",fontWeight:700,color:expPct>35?rd:expPct>28?yl:gn,marginLeft:4}}>{expPct}%</span><span style={{fontSize:12,color:"#8b949e"}}> of rent to expenses</span></>}>
@@ -1632,6 +1627,7 @@ function App(){
             <TS label="Insurance growth" value={insGrowth} onChange={set("insGrowth")} typeMin={LIM.insGrowth[0]} typeMax={LIM.insGrowth[1]} min={0} max={15} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:gn},{value:3,label:"Inflation",color:tk},{value:6,label:"Natl recent",color:tb},{value:10,label:"CA / FL",color:yl},{value:14,label:"Crisis",color:rd}]}/>
             <TS label={<>Marginal income tax rate<IT align="left" text={"Combined federal + state rate. Applied to taxable rental income after deducting loan interest and depreciation ("+fD(Math.round(depBasis/27.5))+"/yr).\n\nIn early years, deductions often exceed income — no tax owed. Tax grows as the loan amortizes and interest shrinks. Cov. and +/− are always pre-tax year-1."}/></>} value={incomeTax} onChange={set("incomeTax")} typeMin={LIM.incomeTax[0]} typeMax={LIM.incomeTax[1]} min={0} max={50} step={1} format={v=>v===0?"Not modeled":v+"%"} ticks={[{value:0,label:"Not modeled",color:gn},{value:22,label:"22% fed",color:tk},{value:32,label:"32% fed",color:tb},{value:37,label:"Top fed",color:yl},{value:46,label:"+CA state",color:rd}]}/>
             {incomeTax>0&&<Tog on={lossCarry} onToggle={()=>set("lossCarry")(!lossCarry)} label={<>Carry rental losses forward<IT align="left" text={"In the early years, loan interest and depreciation usually make the ADU show a loss on paper even when cash comes in. Most owners can't deduct that loss against their salary (the passive-loss rules phase that out above $100K–$150K of income), but the loss isn't lost: it carries forward and offsets the ADU's rental income in later years, and anything left is deductible when you sell.\n\nTurn this off to see the more conservative case where early losses are simply ignored."}/></>} sub={lossCarry?"Early paper losses offset later rental income, lowering tax in later years":"Off — early paper losses are ignored (more conservative)"}/>}
+            <div style={{fontSize:11,color:"#6e7681",lineHeight:1.45}}>For income tax, the building is written off as depreciation ({fD(Math.round(depBasis/27.5))}/yr over 27.5 years, furnishings excluded).</div>
           </div>
         </Section>
 
@@ -1729,23 +1725,18 @@ function App(){
         </div>
 
         {(hasCustom||isSTR)&&(<>
-        {/* LEGEND */}
-        <div style={{marginTop:16,padding:"14px 18px",...card,fontSize:11,lineHeight:1.7,color:"#8b949e"}}>
-          <strong style={{color:"#e6edf3"}}>Reading the results: </strong>
-          <strong style={{color:tb}}>Cov.</strong> and <strong style={{color:tb}}>+/−</strong> are year-1 pre-tax cash flow.
-          <strong style={{color:tb}}> CF+</strong>, <strong style={{color:yl}}>Payback</strong>, and <strong style={{color:gn}}>Return</strong> all account for rent growth{incomeTax>0?" and income tax at "+incomeTax+"%":""}.
-          <strong style={{color:gn}}> Equity</strong> = rough value-added estimate ({grm}× LTR rent via GRM — a heuristic; actual appraisals use comparable sales, and coastal-market GRMs run 200–300×).
-          Builder markup of {markup}% ({fD(markupAmt)}) included. Structure $/sqft covers the unit shell, finishes, MEP, and built-in appliances — foundation, panel upgrades, site work, and furnishing are separate (no double-counting).
-          <strong style={{color:"#e6edf3"}}> Not included:</strong> solar panels (mandatory in CA, $5–10K), landscaping restoration, or HOA fees.
-          <span style={{color:tb}}> Settings saved automatically.</span>
-        </div>
-
-        {/* TAX EXPLAINER */}
-        <div style={{marginTop:12,padding:"16px 18px",...card,fontSize:11,lineHeight:1.7,color:"#8b949e"}}>
-          <strong style={{color:"#e6edf3"}}>How ADU rental income is taxed</strong>
-          <div style={{marginTop:6}}>
-            Rental income goes on <strong style={{color:"#c9d1d9"}}>Schedule E</strong> — no LLC needed. You deduct expenses, loan interest, and depreciation ({fD(Math.round(depBasis/27.5))}/yr over 27.5 years). Early on, deductions typically exceed income — no tax owed. As the loan amortizes and interest shrinks, taxable income grows. The <strong style={{color:"#c9d1d9"}}>passive activity rules</strong> limit how useful early-year paper losses are: the $25K loss allowance phases out above $100K MAGI and disappears at $150K. Most coastal-metro homeowners can't use it. Suspended losses carry forward until sale. The tax slider applies your combined federal + state rate to taxable income after deductions in CF+, Payback, and Return. Set to 0% for the pre-tax view.
-          </div>
+        {/* HOW THE NUMBERS WORK — reference notes, collapsed by default */}
+        <div style={{marginTop:16,...card}}>
+          <button type="button" aria-expanded={showHow} onClick={()=>setShowHow(v=>!v)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 22px",cursor:"pointer",width:"100%",background:"transparent",border:"none",borderRadius:10,fontFamily:"inherit"}}>
+            <span style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:500}}>How the numbers work</span>
+            <span style={{fontSize:13,color:"#8b949e"}}>{showHow?"▴":"▾"}</span>
+          </button>
+          {showHow&&(<div style={{padding:"0 22px 18px",fontSize:11.5,lineHeight:1.7,color:"#8b949e",display:"flex",flexDirection:"column",gap:10,maxWidth:820}}>
+            <div><strong style={{color:"#e6edf3"}}>Reading the results.</strong> Cov. and +/− are first-month, pre-tax cash flow. CF+, Payback and Return include rent growth{incomeTax>0?" and income tax at "+incomeTax+"%":""}. Equity is the value multiplier ({grm}× long-term rent) — a heuristic; appraisals use comparable sales.</div>
+            <div><strong style={{color:"#e6edf3"}}>What's in the cost.</strong> Structure $/sq ft covers the shell, finishes, systems and built-in appliances; foundation, site work and furnishing are separate lines. The builder margin ({markup}%, {fD(markupAmt)}) is included. Not included: solar panels (required on new California homes, about $5–10K), landscaping restoration, or HOA fees.</div>
+            <div><strong style={{color:"#e6edf3"}}>How rental income is taxed.</strong> It goes on Schedule E — no LLC needed. You deduct expenses, loan interest and depreciation. Early on, deductions usually exceed income, so no tax is owed; as interest shrinks, taxable income grows. The passive-loss rules limit using those early losses against other income (the $25K allowance phases out between $100K and $150K of income), but they carry forward — set under Taxes & insurance. The income tax rate applies to CF+, Payback and Return; leave it at 0% for a pre-tax view.</div>
+            <div style={{color:tb}}>Settings are saved automatically in this browser.</div>
+          </div>)}
         </div>
 
         {/* SOURCES */}

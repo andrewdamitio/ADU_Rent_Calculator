@@ -132,11 +132,11 @@ describe("one simulation, consistent numbers", () => {
     const i = await load("?customRent=2600&cashDown=20");
     assert.equal(i.text().match(/Payback\?([\d.]+ yr|Never|Immediate)/)[1], pb);
   });
-  test("year-1 card matches the monthly breakdown; post-loan card matches 'Life after the loan'", async () => {
+  test("year-1 card matches the monthly breakdown; post-loan card matches the full picture's ongoing income", async () => {
     const p = await load("?customRent=2600&cashDown=20&view=consumer");
     const t = p.text();
     assert.ok(p.card("Year-1 cash flow").startsWith(t.match(/([+−]?\$[\d,]+)\/moNet (income|subsidy) in rental year 1/)[1]));
-    assert.ok(p.card("Income after the loan").startsWith(t.match(/onward(−?\$[\d,]+)\/mo/)[1]));
+    assert.ok(p.card("Income after the loan").startsWith(t.match(/Ongoing rental incomeAbout (−?\$[\d,]+)\/mo/)[1]));
   });
   test("internal Return matches the consumer total return", async () => {
     const cons = (await load("?customRent=2600&cashDown=20&view=consumer")).text().match(/Total return.{0,600}?([+−]\$[\d.]+[kM])/)[1];
@@ -189,7 +189,21 @@ describe("cost model", () => {
 });
 
 describe("construction-period interest", () => {
-  const readout = t => t.match(/About (\$[\d,]+) of interest over the (\d+)-month build, on an average drawn balance of (\$[\d,]+)/);
+  // [_, total interest, build months, average drawn balance] from the Financing section.
+  const readout = t => {
+    const i = t.match(/Construction interest: (\$[\d,]+)/), a = t.match(/an average of (\$[\d,]+) over the (\d+)-month build/);
+    return i && a ? [null, i[1], a[2], a[1]] : null;
+  };
+  test("each option states what it means in dollars, and the totals reconcile", async () => {
+    const t = (await load("?customRent=2600&cpsf=250")).text();
+    const paid = t.match(/Paid monthlyYou pay about (\$[\d,]+) in interest-only bills during the build, then (\$[\d,]+)\/mo/);
+    const cap = t.match(/Added to the loanNothing to pay during the build\. The loan grows by (\$[\d,]+), so the payment is (\$[\d,]+)\/mo — about (\$[\d,]+) more over the loan/);
+    assert.ok(paid && cap, "both option cards show their numbers");
+    // Over a 10-year loan: added-to-loan payments minus (paid-monthly payments + the interest paid during the build).
+    const extra = money(cap[2]) * 120 - (money(paid[2]) * 120 + money(paid[1]));
+    assert.ok(Math.abs(extra - money(cap[3])) <= 130, extra + " vs " + cap[3]);
+    assert.ok(money(cap[3]) < money(paid[1]), "the extra is less than the interest itself, not more");
+  });
   test("interest accrues on the S-curve draw balance", async () => {
     // $250/sq ft gives a $261,650 project, $0 down, 6 months, 7.5%. Soft costs ($35,400 with markup) are
     // drawn up front and hard costs follow the S-curve, so the average drawn balance is ~48% of the loan.
@@ -223,6 +237,30 @@ describe("construction-period interest", () => {
     const t = (await load("?customRent=2600&cashDown=20&view=consumer")).text();
     assert.match(t, /Construction-period interest/);
     assert.doesNotMatch((await load("?customRent=2600&cashDown=20&conIntMode=cap&view=consumer")).text(), /Construction-period interest/);
+  });
+});
+
+describe("streamlined layout", () => {
+  test("Summary: no duplicate post-loan card, no empty tax bar, net equity starts as one line", async () => {
+    const p = await load("?customRent=2600&cashDown=20&view=consumer");
+    const t = p.text();
+    assert.doesNotMatch(t, /Life after the loan/);
+    assert.doesNotMatch(t, /Income tax \(not modeled/);
+    const chart = () => p.doc.querySelectorAll(".screen-only svg[role=img]")[1].querySelectorAll("path[fill=none]").length;
+    assert.equal(chart(), 1);
+    await p.click("Show what makes it up");
+    assert.equal(chart(), 4);
+    assert.match((await load("?customRent=2600&incomeTax=24&view=consumer")).text(), /Income tax \(24% marginal rate\)/);
+  });
+  test("Full model: contingency and margin together, breakdown last, notes collapsed", async () => {
+    const p = await load("?customRent=2600");
+    const t = p.text();
+    assert.match(t, /Contingency & builder margin.*Budget confidence.*Build time.*Where the money goes.*All-in build cost/);
+    assert.match(t, /Monthly payment: \$[\d,]+\/moTotal repaid/);
+    assert.match(t, /How the numbers work/);
+    assert.doesNotMatch(t, /How rental income is taxed/);
+    await p.click("How the numbers work");
+    assert.match(p.text(), /How rental income is taxed/);
   });
 });
 
@@ -402,6 +440,11 @@ describe("what if you sold", () => {
     await p.click("Not planning to sell? Hide this");
     assert.doesNotMatch(p.text(), /What if you sold\?/);
     assert.equal(p.saved().saleOn, false);
+  });
+  test("a loan paid off by the sale year shows no payoff line", async () => {
+    const t = (await load("?customRent=2600&cashDown=20&saleYear=10&view=consumer")).text();
+    assert.doesNotMatch(t, /Pay off the remaining loan/);
+    assert.match(t, /with the loan paid off/);
   });
   test("the report includes the sale scenario", async () => {
     assert.match((await load("?customRent=2600&saleYear=12")).report().textContent, /If sold after 12 years of renting: .* leaves \$[\d,]+ — a net gain of/);
