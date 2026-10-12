@@ -221,7 +221,7 @@ function TimeChart({pts,series,area,pointColor,vlines=[],marker,tooltip,height=2
   const hp=hov!==null?pts[hov]:null;
   const tipLeft=hp?Math.min(Math.max(xC(hp.year),80),W-80):0;
   return(<div ref={wrapRef} style={{position:"relative"}}>
-    <svg width={W} height={H} role="img" aria-label={ariaLabel} style={{display:"block",maxWidth:"100%",fontFamily:"'DM Sans',sans-serif"}} onClick={()=>{setPin(false);setHov(null)}}>
+    <svg viewBox={"0 0 "+W+" "+H} role="img" aria-label={ariaLabel} style={{display:"block",width:"100%",height:"auto",fontFamily:"'DM Sans',sans-serif"}} onClick={()=>{setPin(false);setHov(null)}}>
       <defs>
         <linearGradient id={uid+"p"} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={area.pos} stopOpacity="0.25"/><stop offset="100%" stopColor={area.pos} stopOpacity="0.02"/></linearGradient>
         <linearGradient id={uid+"n"} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={area.neg} stopOpacity="0.02"/><stop offset="100%" stopColor={area.neg} stopOpacity="0.22"/></linearGradient>
@@ -347,7 +347,7 @@ const ltCard={background:LT.card,border:"1px solid "+LT.border,borderRadius:12,b
 
 // Consumer-view card with a years slider and quick presets (loan term, or evaluation horizon when all-cash).
 function YearsCard({title,value,onChange,min,max,presets,unit,aria,note}){
-  return(<div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
+  return(<div className="pcard" style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,gap:8}}>
       <span style={{fontSize:12,color:LT.body}}>{title}</span>
       <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text,whiteSpace:"nowrap"}}>{value}{unit}</span>
@@ -366,7 +366,7 @@ function YearsCard({title,value,onChange,min,max,presets,unit,aria,note}){
   </div>);
 }
 
-function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -377,6 +377,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
       <div>
       <h1 style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,letterSpacing:"-0.02em",color:LT.text,margin:"0 0 6px"}}>Your ADU Investment Summary</h1>
       <p style={{fontSize:14,color:LT.body,margin:0,lineHeight:1.5}}>{sqft} sq ft {utype.toLowerCase()} · {fD(total)} project · {loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash"}</p>
+      <p className="print-only" style={{fontSize:12,color:LT.muted,margin:"6px 0 0"}}>{customName?customName+" · ":""}Prepared {new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})} · estimates only</p>
       </div>
       <div className="no-print" style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap"}}>
         <button onClick={()=>window.print()} style={{background:LT.card,border:"1px solid "+LT.border,borderRadius:8,color:LT.body,fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>Print / Save as PDF</button>
@@ -384,8 +385,23 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
       </div>
     </div>
 
+    {/* PRINT: the scenario as plain values in place of the input cards below */}
+    <div className="pcard print-only" style={{...ltCard,padding:"14px 22px",marginBottom:20}}>
+      <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:8}}>Your scenario</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"8px 16px",fontSize:12.5,color:LT.body}}>
+        {[
+          [isSTR?"Expected revenue":"Monthly rent",(hasCustom||isSTR)?fD(rentY1)+"/mo":"Not entered"],
+          ["Down payment",cashDown===100?"All cash ("+fD(total)+")":cashDown===0?"$0 (100% financed)":fD(cashDownAmt)+" ("+cashDown+"%)"],
+          ...(loanAmt>0?[["Loan",fD(loanAmt)+" at "+rate.toFixed(1)+"% for "+term+" yr"],["Monthly payment",fD(loanPmt)]]:[["Evaluated over",horizon+" years"]]),
+          ["Construction",buildMonths>0?buildMonths+" months":"Already built"],
+          ...(cm&&cm.conPaid+cm.conCap>0?[["Construction interest",fD(cm.conPaid+cm.conCap)+(cm.conCap>0?" (added to loan)":" (paid during build)")]]:[]),
+        ].map(([k,v])=><div key={k}><div style={{fontSize:11,color:LT.muted}}>{k}</div><div style={{fontFamily:"'Fraunces',serif",fontSize:15,fontWeight:600,color:LT.text}}>{v}</div></div>)}
+      </div>
+    </div>
+
+    <div className="no-print">
     {/* RENT YOU'D CHARGE — same state as the Full model */}
-    <div style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+(isSTR?"#94a3b8":LT.info),opacity:isSTR?0.5:1,pointerEvents:isSTR?"none":"auto"}}>
+    <div className="pcard" style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+(isSTR?"#94a3b8":LT.info),opacity:isSTR?0.5:1,pointerEvents:isSTR?"none":"auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,gap:12,flexWrap:"wrap"}}>
         <h3 style={{margin:0,fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,fontFamily:"inherit"}}>What would you charge for rent?</h3>
         {isSTR&&<span style={{fontSize:11,color:LT.warn}}>Not applicable in STR mode — rent is driven by your nightly rate</span>}
@@ -412,7 +428,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* DOWN PAYMENT SLIDER — consumer-facing, syncs with internal */}
-    <div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
         <span style={{fontSize:12,color:LT.body}}>How much do you want to put down?</span>
         <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text}}>{cashDown===0?"$0 down":cashDown===100?"All cash ("+fD(total)+")":fD(cashDownAmt)+" ("+cashDown+"%)"}</span>
@@ -435,7 +451,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
 
     {loanAmt>0?(<>
     {/* INTEREST RATE — read-only here; only adjustable in the Full model */}
-    <div style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+    <div className="pcard" style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
       <div>
         <div style={{fontSize:12,color:LT.body,marginBottom:2}}>Interest rate on your loan</div>
         <div style={{fontSize:11,color:LT.muted}}>Fixed for this estimate — adjustable in the Full model.</div>
@@ -451,9 +467,10 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     <YearsCard title="How many years should we look at?" value={horizon} onChange={setHorizon} min={5} max={30} presets={[5,10,20,30]} unit=" years" aria="Years to evaluate"
       note={"With no loan, this only sets how far out the summary looks — returns, cash collected and the full picture are measured at year "+horizon+" of renting."}/>
     )}
+    </div>
 
     {!hasCustom&&!isSTR&&(
-      <div style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
+      <div className="pcard" style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
         <div style={{fontSize:36,marginBottom:12}}>↑</div>
         <div style={{fontSize:17,fontWeight:600,color:LT.text,marginBottom:8}}>Enter your estimated rent to see the analysis</div>
         <div style={{fontSize:13,color:LT.body,lineHeight:1.6,maxWidth:420,margin:"0 auto"}}>The full breakdown — monthly cash flow, equity buildup, payback period, and stress tests — appears once you provide a rent estimate for your specific area. Even a rough number works; you can refine it later.</div>
@@ -468,7 +485,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     const secH={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600};
     return(<>
     {/* HERO outcome card */}
-    <div style={{...ltCard,padding:"28px 30px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"28px 30px",marginBottom:20}}>
       <div style={{...secH,marginBottom:14}}>Estimated total return</div>
       <div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap"}}>
         {cm.hero.map(h=>{const up=h.ret>=0;return(
@@ -484,12 +501,12 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* MONTHLY BREAKDOWN — rental-year slider */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6,gap:8,flexWrap:"wrap"}}>
         <div style={secH}>Monthly breakdown</div>
         <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:LT.text}}>Rental year {Math.min(barYear,cm.bars.length)}{loanAmt>0&&barYear>term?" (post-loan)":""}</span>
       </div>
-      <div style={{marginBottom:14}}>
+      <div className="no-print" style={{marginBottom:14}}>
         <input type="range" aria-label="Rental year" min={1} max={cm.bars.length} step={1} value={Math.min(barYear,cm.bars.length)} onChange={e=>setBarYear(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:5,cursor:"pointer",margin:0}}/>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:LT.muted,marginTop:4}}>
           <span>Year 1</span>
@@ -577,7 +594,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* PROPERTY VALUE */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:14}}>Impact on your property value</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:16,marginBottom:16}}>
         <div style={{textAlign:"center",padding:"14px 10px",borderRadius:10,background:LT.borderLight}}>
@@ -603,7 +620,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* CASH POSITION TIMELINE */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:4}}>Your cash position over time</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Every dollar in and out of your pocket: {cashDownAmt>0?"the "+fD(cashDownAmt)+" down payment, then ":""}each month's rent after expenses, minus loan payments{taxNote}. Payback is where the line crosses zero.</div>
       <TimeChart pts={cm.pts} ariaLabel="Cumulative cash position by year"
@@ -622,7 +639,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* NET EQUITY POSITION */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:4}}>Net equity position over time</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Total wealth created by the ADU at any point — asset value <strong style={{color:LT.info}}>minus</strong> remaining loan balance <strong style={{color:LT.info}}>plus</strong> your cash position. After the loan is paid off, the payment becomes income and growth accelerates.</div>
       <TimeChart pts={cm.pts} height={250} ariaLabel="Net equity, ADU value, loan balance and cash position by year"
@@ -648,7 +665,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* LIFE AFTER THE LOAN */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20,background:post.net>=0?"linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)":LT.warnBg,border:"1px solid "+(post.net>=0?"#bbf7d0":"#fde68a")}}>
+    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20,background:post.net>=0?"linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)":LT.warnBg,border:"1px solid "+(post.net>=0?"#bbf7d0":"#fde68a")}}>
       <div style={{fontSize:11,color:post.net>=0?LT.pos:LT.warn,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:10}}>{loanAmt>0?"Life after the loan — rental year "+(term+1)+" onward":"Income in rental year "+cm.evalYrs}</div>
       <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap",marginBottom:10}}>
         <div style={{fontFamily:"'Fraunces',serif",fontSize:38,fontWeight:700,color:post.net>=0?LT.pos:LT.warn,lineHeight:1}}>{fD(post.net)}/mo</div>
@@ -660,7 +677,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* THE FULL PICTURE — what you put in, what you got, what you keep */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:14}}>{loanAmt>0?"The full picture when the loan is paid off":"The full picture after "+cm.evalYrs+" years"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:0}}>
         {[
@@ -693,7 +710,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {/* STRESS TESTS */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:6}}>Stress tests</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14}}>How one thing going wrong would change your timeline and your return:</div>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
@@ -1149,7 +1166,7 @@ function App(){
         </>);})():(<div style={{...card,marginTop:8,padding:"32px 24px",textAlign:"center"}}><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.6}}>Enter the monthly rent you'd charge above to see the results for this site. Break-even for the project as configured is <strong style={{color:"#e6edf3"}}>{fD(Math.round(beRent))}/mo</strong>.</p></div>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} rentY1={grossY1} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>

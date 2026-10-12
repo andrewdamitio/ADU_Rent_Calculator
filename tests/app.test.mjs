@@ -218,6 +218,23 @@ describe("consumer summary", () => {
   });
 });
 
+describe("printout", () => {
+  test("inputs are screen-only; a static scenario card and date are print-only", async () => {
+    const { doc } = await load("?customRent=2600&cashDown=20&view=consumer");
+    for (const r of doc.querySelectorAll("#root input")) assert.ok(r.closest(".no-print"), "input hidden in print: " + (r.id || r.getAttribute("aria-label")));
+    const printed = [...doc.querySelectorAll(".print-only")].map(e => e.textContent).join(" ");
+    assert.match(printed, /Your scenario.*\$2,600\/mo.*\$52,330 \(20%\).*7\.5% for 10 yr/);
+    assert.match(printed, /Prepared .*estimates only/);
+  });
+  test("charts scale to the page instead of clipping", async () => {
+    const { doc } = await load("?customRent=2600&view=consumer");
+    for (const svg of doc.querySelectorAll("svg[role=img]")) {
+      assert.ok(svg.getAttribute("viewBox"));
+      assert.equal(svg.style.width, "100%");
+    }
+  });
+});
+
 describe("stress tests", () => {
   const rows = p => [...p.doc.querySelectorAll("table tbody tr")].map(tr => {
     const td = [...tr.querySelectorAll("td")];
