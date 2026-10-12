@@ -326,6 +326,8 @@ function budgetConfidence(amounts,firm,markup,contingencyAmt){
   return{
     lines,sigma,base,firmedPct:base>0?firmed/base*100:0,
     p50:base,p80:base+need80,
+    // 80% range of the build cost (10% chance below p10, 10% above p90).
+    p10:Math.max(0,base-1.2816*sigma),p90:base+1.2816*sigma,
     // Chance the budget (line items + contingency) covers the build.
     coverage:sigma>0?normCdf(contingencyAmt/sigma)*100:100,
     // Rounded up, so applying it always reaches at least P80.
@@ -650,7 +652,7 @@ function PrintReport({rep}){
     </tr>))}
   </tbody></table>);
   const kpis=[
-    ["Total project cost",fD(rep.total),rep.loanAmt>0?fD(rep.cashDownAmt)+" down · "+fD(rep.loanAmt)+" financed":"Paid in cash"],
+    ["Total project cost",fD(rep.total),"Likely "+fShort(rep.costRange.lo)+"–"+fShort(rep.costRange.hi)+" as built"],
     ["Monthly loan payment",rep.loanAmt>0?fD(rep.loanPmt):"None",rep.loanAmt>0?rep.rate.toFixed(2).replace(/0$/,"")+"% · "+rep.term+" years":"No loan"],
     ["Year-1 cash flow",(cm.bars[0].net>=0?"+":"")+fD(cm.bars[0].net)+"/mo","Average month"+(rep.loanAmt>0&&rep.incomeTax>0?", after loan and tax":rep.loanAmt>0?", after loan payment":rep.incomeTax>0?", after tax":", after expenses")],
     ["Cash-flow positive",cm.cfPlus<=0?"Day one":fYr(cm.cfPlus)+(cm.cfAtTerm?"*":""),"From project start"],
@@ -698,6 +700,7 @@ function PrintReport({rep}){
       <div>
         <H2>Project cost</H2>
         <KV rows={[...rep.costRows.map(([k,v])=>[k,fD(v)]),["Total project cost",fD(rep.total),true]]}/>
+        <div style={{fontSize:9,color:RP.muted,marginTop:4}}>Likely final cost {fD(rep.costRange.lo)}–{fD(rep.costRange.hi)} (80% range; {rep.costRange.note}). {rep.loanAmt>0?fD(rep.cashDownAmt)+" down, "+fD(rep.loanAmt)+" financed.":"Paid in cash."}</div>
         <H2>Return summary{rep.loanAmt>0?" at loan payoff":" after "+rep.evalYrs+" years"}</H2>
         <KV rows={[...ledger.map(([k,v])=>[k,(Math.round(v)>0?"+":"")+fD(v)]),["Total return",(cm.ret>=0?"+":"")+fD(cm.ret),true]]}/>
         <div style={{fontSize:9,color:RP.muted,marginTop:4}}>{cm.roi===null?"":cm.roi.toFixed(1)+"%/yr compound on the "+fD(rep.total)+" project cost"}{cm.roiCash!==null&&rep.loanAmt>0?"; "+cm.roiCash.toFixed(1)+"%/yr on the "+fD(rep.cashDownAmt)+" invested":""}. Afterward the ADU nets about {fD(cm.postLoan.net)}/mo, growing with rent.</div>
@@ -810,7 +813,7 @@ const PSF_RANGE={detached:[350,600],prefab:[300,550],garage:[150,300],attached:[
 const WF_COLORS={dark:["#58a6ff","#3fb950","#a371f7","#d29922","#f0883e","#f85149"],light:["#2563eb","#16a34a","#7c3aed","#d97706","#ea580c","#dc2626"]};
 // "Where the money goes": each cost step as a bar starting where the previous one ended, then the
 // total — plus an all-in $/sq ft check against the typical range for the project type.
-function CostWaterfall({steps,total,buildTotal,sqft,ptypeKey,typeNoun,dark}){
+function CostWaterfall({steps,total,buildTotal,sqft,ptypeKey,typeNoun,dark,range}){
   const c=dark?{text:"#c9d1d9",muted:"#8b949e",track:"#0d1117",rule:"#21262d",strong:"#e6edf3",ok:gn,warn:yl}:{text:LT.body,muted:LT.muted,track:LT.borderLight,rule:LT.borderLight,strong:LT.text,ok:LT.pos,warn:LT.warn};
   const pal=WF_COLORS[dark?"dark":"light"];
   const shown=steps.filter(s=>s.amt>0);
@@ -828,6 +831,7 @@ function CostWaterfall({steps,total,buildTotal,sqft,ptypeKey,typeNoun,dark}){
   return(<div>
     {shown.map((s,i)=>{const r=row(s.label,cum/total*100,s.amt/total*100,pal[steps.indexOf(s)%pal.length],s.amt,false,s.label);cum+=s.amt;return r})}
     <div style={{borderTop:"1px solid "+c.rule,marginTop:4}}>{row("Total project cost",0,100,dark?"#6e7681":"#475569",total,true,"total")}</div>
+    {range&&<div style={{fontSize:12,color:c.text,marginTop:6,lineHeight:1.5}}>Likely final cost: <strong style={{color:c.strong}}>{fD(range.lo)}–{fD(range.hi)}</strong> <span style={{color:c.muted}}>(80% range; {range.note})</span></div>}
     <div style={{fontSize:12,color:c.text,marginTop:10,lineHeight:1.5}}>
       All-in build cost: <strong style={{color:c.strong}}>{fD(psf)}/sq ft</strong>{" — "}
       <span style={{color:verdict==="within"?c.ok:c.warn}}>{verdict==="within"?"within":verdict==="above"?"above":"below"} the typical {fD(lo)}–{fD(hi)}/sq ft for a {typeNoun}</span>
@@ -909,7 +913,7 @@ const fieldLabel={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpa
 const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color:LT.text,whiteSpace:"nowrap"};
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
-function ConsumerView({cm,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,costRange,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);const[showParts,setShowParts]=useState(false);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -922,6 +926,7 @@ function ConsumerView({cm,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,
       <div style={{...ltCard,padding:"20px 24px",marginBottom:16,borderLeft:"4px solid "+(cm.ret>=0?LT.pos:LT.neg)}}>
         <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:8}}>The short answer</div>
         <p style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:500,lineHeight:1.45,color:LT.text}}>{verdict}</p>
+        <div style={{fontSize:12.5,color:LT.muted,marginTop:8}}>Project cost estimate {fD(total)} — likely {fD(costRange.lo)}–{fD(costRange.hi)} as built (80% range; {costRange.note}).</div>
       </div>
     )}
 
@@ -1124,7 +1129,7 @@ function ConsumerView({cm,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,
     {/* WHERE THE MONEY GOES */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:12}}>Where the money goes</div>
-      <CostWaterfall steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={ptypeKey} typeNoun={unitNoun}/>
+      <CostWaterfall steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={ptypeKey} typeNoun={unitNoun} range={costRange}/>
     </div>
 
     {/* PROPERTY VALUE */}
@@ -1376,6 +1381,11 @@ function App(){
   const subtotal=buildCost+siteCost+softCostBase+contingencyAmt,markupAmt=Math.round(markupBase*(markup/100));
   const assetCost=subtotal+markupAmt;
   const origFeeAmt=origFeeOn?Math.round(assetCost*(origFee/100)):0;
+  // The estimate as a range: P10–P90 of the build cost (line items), plus any loan fee. With budget
+  // tracking off, every line is treated as a rough estimate.
+  const r1k=x=>Math.round(x/1000)*1000;
+  const costRange={lo:r1k(bc.p10+origFeeAmt),hi:r1k(bc.p90+origFeeAmt),
+    note:firmOn?Math.round(bc.firmedPct)+"% of line items quoted or known":"rough estimate — each line taken as ±25% until quotes come in"};
   const total=assetCost+origFeeAmt;
   const cashDownAmt=Math.round(total*(cashDown/100)),loanAmt=total-cashDownAmt;
   // Cost steps for the "Where the money goes" breakdown (they sum to the project total).
@@ -1534,7 +1544,7 @@ function App(){
       cm,title:customName||unit,
       subtitle:(customName?unit+" · ":"")+strategy[0].toUpperCase()+strategy.slice(1)+" · "+fD(grossY1)+"/mo "+(isSTR?"projected revenue":"rent")+" in year 1",
       date:new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"}),
-      total,loanAmt,cashDownAmt,cashDown,loanPmt,rate,term,evalYrs,incomeTax,buildMonths,verdict,cmp:mdl.cmp,
+      total,loanAmt,cashDownAmt,cashDown,loanPmt,rate,term,evalYrs,incomeTax,buildMonths,verdict,cmp:mdl.cmp,costRange,
       costRows:[
         ["Structure ("+sqft+" sq ft × $"+cpsf+")",buildCost],
         ["Site work",siteCost],
@@ -1660,7 +1670,7 @@ function App(){
           <TS label={<>Construction period<IT align="left" text={"Months from permit approval to first rent check. Regular loan payments start when the ADU is finished; until then there's no rent, and interest on the funds drawn so far is set below.\n\nAll results are measured from project start, so a longer build pushes every result "+buildMonths+" months later."}/></>} value={buildMonths} onChange={set("buildMonths")} typeMin={LIM.buildMonths[0]} typeMax={LIM.buildMonths[1]} min={0} max={18} step={1} format={v=>v===0?"None (already built)":v+" months"} ticks={[{value:0,label:"Already built",color:gn},{value:4,label:"Prefab",color:tb},{value:6,label:"Typical",color:tk},{value:10,label:"Stick-built",color:yl},{value:15,label:"+permit delays",color:rd}]}/>
 
           <SL>Where the money goes</SL>
-          <CostWaterfall dark steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={projectType} typeNoun={ptype.noun}/>
+          <CostWaterfall dark range={costRange} steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={projectType} typeNoun={ptype.noun}/>
         </Section>
 
         {/* 2. FINANCING */}
@@ -1874,7 +1884,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} cmpCols={mdl.cmp} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} costRange={costRange} cmpCols={mdl.cmp} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>

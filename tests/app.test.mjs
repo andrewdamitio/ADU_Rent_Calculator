@@ -240,6 +240,32 @@ describe("construction-period interest", () => {
   });
 });
 
+describe("cost as a range", () => {
+  // Same derivation as budget confidence: ±25% bands read as 90% ranges, combined; 80% range = ±1.2816σ.
+  const lines = [180000, 10000, 8000, 8000, 3000, 2000, 10000, 8000, 8000, 3500];
+  const base = lines.reduce((s, x) => s + x * 1.2, 0);
+  const sigma = Math.sqrt(lines.reduce((s, x) => s + (x * 1.2 * 0.25 / 1.6449) ** 2, 0));
+  const r1k = x => Math.round(x / 1000) * 1000;
+  const lo = r1k(base - 1.2816 * sigma), hi = r1k(base + 1.2816 * sigma);
+  const fmt = n => "$" + n.toLocaleString("en-US");
+  test("the Summary, the breakdown and the report all show the same 80% range", async () => {
+    const c = await load("?customRent=2600&view=consumer");
+    assert.ok(c.text().includes("Project cost estimate $299,150 — likely " + fmt(lo) + "–" + fmt(hi) + " as built (80% range; rough estimate"), c.text().match(/Project cost estimate.{0,120}/)?.[0]);
+    assert.ok(c.text().includes("Likely final cost: " + fmt(lo) + "–" + fmt(hi)));
+    assert.match(c.report().textContent, new RegExp("Likely final cost \\" + fmt(lo).replace(",", ",") + "–"));
+    assert.ok((await load("?customRent=2600")).text().includes("Likely final cost: " + fmt(lo) + "–" + fmt(hi)), "Full model too");
+  });
+  test("quotes narrow it; known prices collapse it; the loan fee shifts it", async () => {
+    const width = t => { const m = t.match(/likely (\$[\d,]+)–(\$[\d,]+) as built/); return money(m[2]) - money(m[1]); };
+    const est = width((await load("?customRent=2600&view=consumer")).text());
+    const q = width((await load("?customRent=2600&firmOn=1&firm=qqqqqqqqqqq&view=consumer")).text());
+    assert.ok(q < est / 2, q + " vs " + est);
+    assert.equal(width((await load("?customRent=2600&firmOn=1&firm=kkkkkkkkkkk&view=consumer")).text()), 0);
+    const fee = (await load("?customRent=2600&origFeeOn=1&origFee=5&view=consumer")).text().match(/likely (\$[\d,]+)–/)[1];
+    assert.equal(money(fee), r1k(base - 1.2816 * sigma + 14958));
+  });
+});
+
 describe("financing comparison", () => {
   const table = root => {
     const t = [...root.querySelectorAll("table")].find(t => /Monthly payment/.test(t.textContent) && /Net position at 15 years/.test(t.textContent));
