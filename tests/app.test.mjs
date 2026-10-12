@@ -235,6 +235,93 @@ describe("Full model layout", () => {
   });
 });
 
+describe("project-type templates", () => {
+  const pick = async (p, label) => {
+    const b = [...p.doc.querySelectorAll("[role=radiogroup][aria-labelledby=ptype-label] button")].find(b => b.textContent.startsWith(label));
+    b.click(); await wait(60);
+  };
+  test("the default scenario is the detached template, unmodified", async () => {
+    const p = await load("?customRent=2600");
+    assert.equal(p.doc.querySelector("[role=radio][aria-checked=true]").textContent.startsWith("Detached new build"), true);
+    assert.doesNotMatch(p.text(), /Customized from/);
+  });
+  test("a garage conversion fills in consistent costs", async () => {
+    const p = await load("?customRent=2000");
+    await pick(p, "Garage conversion");
+    const s = p.saved();
+    assert.equal(s.projectType, "garage");
+    assert.equal(s.sqft, 400);
+    assert.equal(s.hookup, 0, "no utility connection fee for converted space");
+    assert.equal(s.sitePrep, 1000);
+    assert.match(p.text(), /Total est\.\$1\d\d,\d{3}/, "a garage conversion costs far less than the $261,650 detached default");
+    assert.doesNotMatch(p.text(), /Customized from/);
+  });
+  test("a junior ADU needs no foundation, grading or trenching", async () => {
+    const p = await load("?customRent=1600");
+    await pick(p, "Junior ADU");
+    const t = p.text();
+    assert.match(t, /Foundation\?Existing/);
+    assert.match(t, /Grading, demo & accessNone/);
+    assert.match(t, /Utility trenchingNone \(existing\)/);
+  });
+  test("editing a line marks the template customized, and reset restores it", async () => {
+    const p = await load("?projectType=prefab&cpsf=220&foundation=8000&sitePrep=9000&permits=9000&design=3000&markup=10&buildMonths=4&customRent=2600");
+    assert.doesNotMatch(p.text(), /Customized from/);
+    const p2 = await load("?projectType=prefab&cpsf=260&foundation=8000&sitePrep=9000&permits=9000&design=3000&markup=10&buildMonths=4&customRent=2600");
+    assert.match(p2.text(), /Customized from the prefab \/ modular template/);
+    await p2.click("Reset to template");
+    assert.equal(p2.saved().cpsf, 220);
+    assert.doesNotMatch(p2.text(), /Customized from/);
+  });
+  test("the type appears in the Summary header and the report", async () => {
+    const p = await load("?customRent=2000&projectType=garage&sqft=400&view=consumer");
+    assert.match(p.text(), /400 sq ft studio garage conversion/);
+    assert.match(p.report().textContent, /400 sq ft studio garage conversion/);
+  });
+});
+
+describe("typed values", () => {
+  const editor = (p, label) => {
+    const lab = [...p.doc.querySelectorAll(".screen-only span[id]")].find(s => s.textContent.startsWith(label));
+    return lab.closest("div[style*='column']").querySelector("button[title^='Click to type']");
+  };
+  const typeInto = async (p, label, text, key = "Enter") => {
+    editor(p, label).click(); await wait(40);
+    const input = p.doc.querySelector("input[aria-label='Type a value']");
+    Object.getOwnPropertyDescriptor(p.w.HTMLInputElement.prototype, "value").set.call(input, text);
+    input.dispatchEvent(new p.w.Event("input", { bubbles: true }));
+    input.dispatchEvent(new p.w.KeyboardEvent("keydown", { key, bubbles: true }));
+    input.blur?.(); input.dispatchEvent(new p.w.FocusEvent("focusout", { bubbles: true }));
+    await wait(60);
+  };
+  test("an exact quote can be typed, with $ , and k shorthand", async () => {
+    const p = await load("?customRent=2600");
+    await typeInto(p, "Permits", "$11,240");
+    assert.equal(p.saved().permits, 11240);
+    await typeInto(p, "Foundation", "12.5k");
+    assert.equal(p.saved().foundation, 12500);
+    assert.match(p.text(), /Foundation\?\$12,500/);
+  });
+  test("typed values can exceed the slider's range, within the field's limits", async () => {
+    const p = await load("?customRent=2600");
+    await typeInto(p, "Water & sewer fees", "85000");
+    assert.equal(p.saved().hookup, 85000, "slider stops at $60k");
+    await typeInto(p, "Water & sewer fees", "9999999");
+    assert.equal(p.saved().hookup, 300000, "clamped to the field limit");
+  });
+  test("decimals are kept where the slider allows them; garbage and Escape change nothing", async () => {
+    const p = await load("?customRent=2600");
+    await typeInto(p, "Interest rate", "7.25%");
+    assert.equal(p.saved().rate, 7.25);
+    await typeInto(p, "Interest rate", "abc");
+    assert.equal(p.saved().rate, 7.25);
+  });
+  test("a typed value beyond the slider survives a share link", async () => {
+    const p = await load("?customRent=2600&permits=45000");
+    assert.match(p.text(), /Permits, plan check & inspections\?\$45,000/);
+  });
+});
+
 describe("header actions", () => {
   test("Copy model link is the rightmost header button in both views", async () => {
     for (const view of ["internal", "consumer"]) {
