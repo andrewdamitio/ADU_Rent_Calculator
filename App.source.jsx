@@ -179,7 +179,7 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,clientName:"",clientAddr:"",prepName:"",prepCompany:"",reportNotes:"",cmpOn:false,
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"dollars",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,clientName:"",clientAddr:"",prepName:"",prepCompany:"",reportNotes:"",cmpOn:false,
   cmpBOn:true,cmpBName:"Home equity loan, 15 yr",cmpBRate:8,cmpBTerm:15,cmpBDown:0,cmpBFee:2,
   cmpCOn:true,cmpCName:"HELOC, 20 yr",cmpCRate:8.5,cmpCTerm:20,cmpCDown:0,cmpCFee:0,
   cmpDOn:true,cmpDName:"All cash",cmpDRate:0,cmpDTerm:10,cmpDDown:100,cmpDFee:0,hookupCity:"ca",saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
@@ -226,6 +226,7 @@ function shareParamsFromLocation(){
   const raw={};
   SHARE_KEYS.forEach(k=>{if(p.has(k))raw[k]=p.get(k)});
   const out=cleanState(raw);
+  if(!p.has("siteMode")&&FACT_KEYS.some(k=>p.has(k)))out.siteMode="facts";
   out.view=p.get("view")==="consumer"?"consumer":"internal";
   return out;
 }
@@ -1631,8 +1632,8 @@ function App(){
           <SL>Site work</SL>
           <div style={{fontSize:12,color:"#8b949e",marginBottom:6}}>How should site work be estimated?</div>
           <MethodSwitch label="Site work method" value={siteMode} onChange={setSiteMode} options={[
-            {value:"facts",label:"Estimate from site facts",desc:"Answer a few questions about the lot; each cost is calculated with its reason"},
-            {value:"dollars",label:"Enter dollar amounts",desc:"Type each amount — a contractor quote or your own figure — or use the sliders"}]}/>
+            {value:"dollars",label:"Enter dollar amounts",desc:"Type each amount — a contractor quote or your own figure — or use the sliders"},
+            {value:"facts",label:"Estimate from site facts",desc:"Answer a few questions about the lot; each cost is calculated with its reason"}]}/>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {facts?<div style={nested}><SiteFacts s={state} set={set} sf={sf}/></div>:(<div style={{...nested,display:"flex",flexDirection:"column",gap:6}}>
               <TS label={<>Foundation<IT align="left" text="What the structure sits on. Cheapest to priciest: pier/post (posts driven into the ground — common for smaller or elevated units), slab (a poured concrete pad — the typical default), crawl space (a raised foundation with access underneath, needed on uneven lots), and hillside engineering (retaining walls and extra structural work for a sloped site)."/></>} value={foundation} onChange={set("foundation")} box="Foundation" typeMin={LIM.foundation[0]} typeMax={LIM.foundation[1]} min={0} max={50000} step={1000} format={v=>v===0?"Existing":fD(v)} ticks={[{value:0,label:"Existing",color:gn},{value:5000,label:"Pier / post",color:gn},{value:10000,label:"Slab",color:tb},{value:18000,label:"Crawl space",color:tk},{value:35000,label:"Hillside eng.",color:rd}]}/>

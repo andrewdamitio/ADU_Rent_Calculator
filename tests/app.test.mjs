@@ -303,7 +303,7 @@ describe("financing comparison", () => {
   };
   test("off by default; loan terms stop at 20 years (this isn't a mortgage)", async () => {
     const p = await load("?customRent=2600&term=30&view=consumer");
-    assert.equal(table(p.doc.querySelector(".screen-only")), null);
+    assert.ok(table(p.doc.querySelector(".screen-only")) === null, "no comparison table");
     assert.match(p.text(), /Loan term20 years · 7\.5%/);
   });
   test("compares the current setup with each alternative, in all three places", async () => {
@@ -455,7 +455,7 @@ describe("project-type templates", () => {
     assert.doesNotMatch(p.text(), /Customized from/);
   });
   test("a junior ADU needs no foundation, grading or trenching", async () => {
-    const p = await load("?customRent=1600");
+    const p = await load("?customRent=1600&siteMode=facts");
     await pick(p, "Junior ADU");
     const t = p.text();
     assert.match(t, /FoundationInside the existing house — no foundation work\$0/);
@@ -479,10 +479,25 @@ describe("project-type templates", () => {
   });
 });
 
+describe("site work method", () => {
+  test("'Enter dollar amounts' is the default and the left-hand option", async () => {
+    const p = await load("?customRent=2600");
+    const radios = [...p.doc.querySelectorAll("[role=radiogroup][aria-label='Site work method'] [role=radio]")];
+    assert.deepEqual(radios.map(r => r.textContent.startsWith("Enter dollar amounts") ? "dollars" : "facts"), ["dollars", "facts"]);
+    assert.equal(radios[0].getAttribute("aria-checked"), "true");
+    assert.ok(box(p, "Foundation") !== null, "dollar boxes shown by default");
+    assert.doesNotMatch(p.report().textContent, /Site work is estimated from site facts/);
+  });
+  test("a link with site-fact answers opens in site-facts mode", async () => {
+    const t = (await load("?customRent=2600&slope=steep&soil=clay")).text();
+    assert.match(t, /Foundation600 sq ft engineered hillside foundation, post-tensioned for expansive clay\$43,500/);
+  });
+});
+
 describe("site facts", () => {
   const breakdown = t => Object.fromEntries([...t.matchAll(/(Foundation|Grading, demo & access|Utility trenching|Electrical|Surveys & reports)(?: \(counted in soft costs\))?([^$]*?)(\$[\d,]+)/g)].map(m => [m[1], money(m[3])]));
   test("the default facts reproduce the default site-work dollars", async () => {
-    const p = await load("?customRent=2600");
+    const p = await load("?customRent=2600&siteMode=facts");
     const b = breakdown(p.text());
     assert.deepEqual(b, { "Foundation": 10000, "Grading, demo & access": 8000, "Utility trenching": 8000, "Electrical": 3000, "Surveys & reports": 3500 });
     assert.match(p.text(), /Site subtotal\$31,000/);
@@ -510,7 +525,7 @@ describe("site facts", () => {
     assert.equal(p.doc.querySelector("input[aria-label='Foundation in dollars']").value, "43,500");
   });
   test("each template's facts produce its site costs, and editing a fact marks it customized", async () => {
-    const p = await load("?customRent=2000");
+    const p = await load("?customRent=2000&siteMode=facts");
     const b = [...p.doc.querySelectorAll("[role=radiogroup][aria-labelledby=ptype-label] button")].find(b => b.textContent.startsWith("Garage conversion"));
     b.click(); await wait(60);
     assert.equal(breakdown(p.text())["Foundation"], 3000);
@@ -520,7 +535,7 @@ describe("site facts", () => {
     assert.match(p.text(), /Customized from the garage conversion template/);
   });
   test("the report says how site work was estimated", async () => {
-    assert.match((await load("?customRent=2600")).report().textContent, /Site work is estimated from site facts — foundation: 600 sq ft slab on flat ground.*electrical: subpanel off a 200A panel/);
+    assert.match((await load("?customRent=2600&siteMode=facts")).report().textContent, /Site work is estimated from site facts — foundation: 600 sq ft slab on flat ground.*electrical: subpanel off a 200A panel/);
   });
 });
 
@@ -725,7 +740,7 @@ describe("dollar amounts mode", () => {
     for (const l of ["Foundation", "Grading, demo & access", "Utility trenching", "Electrical panel upgrade", "Hardscape & path", "Surveys & reports"])
       assert.ok(box(p, l), l);
     assert.equal(box(p, "Foundation").value, "10,000");
-    assert.equal(box(await load("?customRent=2600"), "Foundation"), null, "facts mode has no foundation box");
+    assert.ok(box(await load("?customRent=2600&siteMode=facts"), "Foundation") === null, "facts mode has no foundation box");
   });
   test("typing a quote into a box sets it, with $ , and k shorthand", async () => {
     const p = await load("?customRent=2600&siteMode=dollars");
