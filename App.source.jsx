@@ -42,7 +42,7 @@ function runModel(p){
   const total=loanAmt+cashDown,hard=Math.max(0,total-spendUp-spendEnd);
   const spentAt=k=>{if(k>=bm)return total;const f=k/bm;return spendUp+hard*(1-RETENTION)*f*f*(3-2*f)};
   const conMr=loanAmt>0&&conMode!=="none"?conRate/12:0;
-  let equity=0,drawn=0,capInt=0,conPaid=0,conBalSum=0,depTaken=0;
+  let equity=0,drawn=0,capInt=0,conPaid=0,conBalSum=0,depTaken=0,basisTotal=depBasis;
   const spend=S=>{const e=Math.min(S,cashDown),d=Math.max(0,S-cashDown);const de=e-equity;equity=e;drawn=d;return de};
 
   // nol: rental tax losses carried forward (passive losses most owners can't use against other income).
@@ -63,7 +63,7 @@ function runModel(p){
       if(m===0){
         // Conversion: the permanent loan is everything drawn plus any capitalized interest.
         bal=drawn+capInt;pmt=cMP(bal,annRate,termYr);
-        dep=(depBasis+capInt+conPaid)/27.5/12;
+        basisTotal=depBasis+capInt+conPaid;dep=basisTotal/27.5/12;
       }
       const rent=grossY1*Math.pow(1+mrG,m),coll=m<leaseUp?0:rent*collectPct,opex=coll*opPct;
       const pt=mPTY1*Math.pow(1+mtG,m),ins=mInsY1*Math.pow(1+miG,m);
@@ -93,7 +93,7 @@ function runModel(p){
   const year=y=>{const sl=months.slice((y-1)*12,y*12);const a=key=>sl.reduce((s,x)=>s+x[key],0)/sl.length;
     return{year:y,rent:a("rent"),opEx:a("vacOpex"),propTax:a("pt"),ins:a("ins"),incomeTax:a("tax"),pmt:a("pay"),interest:a("interest"),principal:a("principal"),net:a("flow")}};
   return{
-    pmt,months,snap,at,year,subsidies,loanEnd:bm+n,
+    pmt,months,snap,at,year,subsidies,loanEnd:bm+n,basisTotal,
     // Construction-period interest: total, the part paid out of pocket, the part added to the loan,
     // and the average drawn balance it accrued on.
     conInterest:conPaid+capInt,conPaid,conCap:capInt,conAvgDrawn:bm>0?conBalSum/bm:0,
@@ -179,7 +179,7 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -193,8 +193,8 @@ function shareUrlFor(state){
 }
 // Valid ranges for numeric fields. Anything loaded from a URL or storage — or typed into a
 // value — is clamped to these. Cost lines go well past their sliders so a real quote always fits.
-const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],incomeTax:[0,50],customRent:[0,100000]};
-const INT_KEYS=new Set(["trenchFt","term","strMonths","buildMonths","horizon"]);
+const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],saleYear:[1,30],sellCost:[0,12],incomeTax:[0,50],customRent:[0,100000]};
+const INT_KEYS=new Set(["saleYear","trenchFt","term","strMonths","buildMonths","horizon"]);
 const ENUMS={projectType:Object.keys(PTYPES),siteMode:["facts","dollars"],fdn:["new","existing","none"],slope:["flat","gentle","moderate","steep"],soil:["known","unknown","clay","rock"],access:["open","side","tight"],demo:["none","small","structure"],panel:["room","full","small"],boundary:["needed","have"],rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
 function cleanField(k,raw){
   const d=DEF[k];
@@ -822,7 +822,7 @@ const fieldLabel={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpa
 const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color:LT.text,whiteSpace:"nowrap"};
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
-function ConsumerView({cm,verdict,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,verdict,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -1149,6 +1149,46 @@ function ConsumerView({cm,verdict,rentY1,unitNoun,grm,assetCost,origFeeAmt,origF
       </div>
     </div>
 
+    {/* WHAT IF YOU SOLD? */}
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:12,flexWrap:"wrap",marginBottom:4}}>
+        <div style={secH}>What if you sold?</div>
+        <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:LT.text}}>After {saleYear} year{saleYear===1?"":"s"} of renting</span>
+      </div>
+      <input type="range" aria-label="Years of renting before selling" min={1} max={30} step={1} value={saleYear} onChange={e=>setSaleYear(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"8px 0 0"}}/>
+      <Presets value={saleYear} onPick={setSaleYear} options={[[5,"5 yr"],[10,"10 yr"],[15,"15 yr"],[20,"20 yr"],[30,"30 yr"]]}/>
+      {(()=>{const sl=cm.sale;const rows=[
+        ["What the ADU adds to the sale price",sl.value,"Estimated value at "+grm+"× rent"],
+        ["Selling costs ("+sl.costPct+"%)",-sl.costs,"Agent commission and closing costs"],
+        ...(sl.bal>0?[["Pay off the remaining loan",-sl.bal,""]]:[]),
+        ...(sl.recapture>0?[["Depreciation recapture tax",-sl.recapture,"Tax on "+fD(sl.recaptured)+" of depreciation deducted while renting"]]:[]),
+        ...(sl.nolBenefit>0?[["Carried-forward losses released",sl.nolBenefit,"Unused rental losses become deductible when you sell"]]:[]),
+      ];return(<>
+        <div style={{display:"flex",flexDirection:"column",marginTop:14}}>
+          {rows.map(([l,v,sub],i)=>(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,padding:"9px 4px",borderBottom:"1px solid "+LT.borderLight}}>
+            <div><div style={{fontSize:13,color:LT.body}}>{l}</div>{sub&&<div style={{fontSize:11.5,color:LT.muted,marginTop:1}}>{sub}</div>}</div>
+            <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:v<0?LT.warn:LT.text,whiteSpace:"nowrap"}}>{(v>0?"+":"")+fD(v)}</span>
+          </div>))}
+          <div style={{display:"flex",justifyContent:"space-between",gap:12,padding:"10px 4px",borderBottom:"1px solid "+LT.border}}>
+            <span style={{fontSize:13.5,fontWeight:600,color:LT.text}}>Cash from the sale</span>
+            <span style={{fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:700,color:LT.text,whiteSpace:"nowrap"}}>{fD(sl.proceeds)}</span>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,padding:"9px 4px"}}>
+            <div><div style={{fontSize:13,color:LT.body}}>Cash flow while you owned it</div><div style={{fontSize:11.5,color:LT.muted,marginTop:1}}>Rent after all costs, minus your down payment{cm.conPaid>0?" and construction interest":""}</div></div>
+            <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:sl.cash<0?LT.warn:LT.text,whiteSpace:"nowrap"}}>{(sl.cash>0?"+":"")+fD(sl.cash)}</span>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"14px 16px",borderRadius:8,background:sl.net>=0?LT.posBg:LT.negBg,marginTop:4}}>
+            <div><div style={{fontSize:15,fontWeight:600,color:LT.text}}>What you'd walk away with</div><div style={{fontSize:12,color:LT.muted,marginTop:2}}>{sl.roi===null?"":(sl.roi>=0?"+":"")+sl.roi.toFixed(1)+"%/yr compound on the "+fD(total)+" project cost, over "+sl.years.toFixed(1).replace(/\.0$/,"")+" years"}</div></div>
+            <span style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,color:sl.net>=0?LT.pos:LT.neg,whiteSpace:"nowrap"}}>{(sl.net>=0?"+":"")+fK2(sl.net)}</span>
+          </div>
+        </div>
+        <div style={{fontSize:12.5,color:LT.body,marginTop:12,lineHeight:1.55}}>
+          {sl.keepNet>=0?<>Or keep it: the ADU would be netting about <strong style={{color:LT.text}}>{fD(sl.keepNet)}/mo</strong> the year after{sl.bal>0?", with "+fD(sl.bal)+" still owed on the loan":", with the loan paid off"}.</>:<>Keeping it means covering about <strong style={{color:LT.text}}>{fD(-sl.keepNet)}/mo</strong> the year after.</>}
+        </div>
+        <div style={{fontSize:11,color:LT.muted,marginTop:8,lineHeight:1.5}}>Simplified: the ADU is valued at its rent multiplier as its share of the home's sale price. Capital gains tax and the home-sale exclusion depend on how the sale is structured with the main house and aren't modeled{incomeTax>0?"":"; with income tax off, depreciation recapture isn't either"}. Talk to a tax professional before selling.</div>
+      </>)})()}
+    </div>
+
     {/* STRESS TESTS */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:6}}>Stress tests</div>
@@ -1232,7 +1272,7 @@ function App(){
   const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,...PTYPES[t].f,projectType:t}))},[]);
   // Switching to dollar amounts starts the sliders at what the site facts produced, so nothing jumps.
   const setSiteMode=useCallback(m=>{fromShareRef.current=false;setState(s=>m==="dollars"&&s.siteMode!=="dollars"?{...s,siteMode:m,...siteDollars(siteFromFacts(s,s.sqft))}:{...s,siteMode:m})},[]);
-  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,incomeTax,lossCarry,firmOn,firm,customRent,customName,view}=state;
+  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,saleYear,sellCost,incomeTax,lossCarry,firmOn,firm,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const ptype=PTYPES[projectType]||PTYPES.detached;
   // Site work: from the site facts, or the dollar sliders when the user prefers to enter amounts.
@@ -1356,8 +1396,21 @@ function App(){
       // Operating cash flow only — construction interest paid out of pocket is shown on its own line.
       cashCollected:end.cash+cashDownAmt+M0.conPaid,conPaid:M0.conPaid,conCap:M0.conCap,
       ret,roi,roiCash,stress:mdl.stress,
+      // Selling after saleYear years of renting: the ADU's value, less selling costs, the remaining
+      // loan and depreciation recapture (unrecaptured §1250 gain, taxed at the marginal rate up to
+      // 25%, and only up to the actual gain), plus the tax value of any carried-forward losses,
+      // which become deductible on a sale. Added to the cash position for the net gain.
+      sale:(()=>{
+        const k=buildMonths+saleYear*12,sn=M0.at(k),tx=incomeTax/100;
+        const costs=sn.value*sellCost/100,netPrice=sn.value-costs;
+        const gain=Math.max(0,netPrice-(M0.basisTotal-sn.depTaken));
+        const recaptured=tx>0?Math.min(sn.depTaken,gain):0,recapture=recaptured*Math.min(tx,0.25);
+        const nolBenefit=tx>0&&lossCarry?sn.nol*tx:0;
+        const proceeds=netPrice-sn.bal-recapture+nolBenefit,net=proceeds+sn.cash;
+        return{value:sn.value,costs,costPct:sellCost,bal:sn.bal,recaptured,recapture,nolBenefit,proceeds,cash:sn.cash,net,years:k/12,roi:annualized(net,total,k/12),keepNet:M0.year(saleYear+1).net};
+      })(),
     };
-  },[mdl,term,total,cashDownAmt,ltrRent,grm,evalK,evalYrs,isCash,buildMonths]);
+  },[mdl,term,total,cashDownAmt,ltrRent,grm,saleYear,sellCost,incomeTax,lossCarry,evalK,evalYrs,isCash,buildMonths]);
 
   const handleReset=()=>{fromShareRef.current=false;setState(DEF);store.del(SK)};
   const onResetClick=()=>{
@@ -1417,6 +1470,7 @@ function App(){
         ["Value multiplier",grm+"× monthly long-term rent"],
       ],
       notes:[
+        "If sold after "+saleYear+" years of renting: the ADU's estimated "+fD(cm.sale.value)+" share of the sale price, less "+sellCost+"% selling costs"+(cm.sale.bal>0?", the "+fD(cm.sale.bal)+" loan balance":"")+(cm.sale.recapture>0?" and "+fD(cm.sale.recapture)+" depreciation recapture":"")+(cm.sale.nolBenefit>0?", plus "+fD(cm.sale.nolBenefit)+" from released losses":"")+", leaves "+fD(cm.sale.proceeds)+" — a net gain of "+fD(cm.sale.net)+" including cash flow while owned. Capital gains tax isn't modeled.",
         ...(firmOn?["Budget confidence: "+Math.round(bc.firmedPct)+"% of line-item costs are quoted or known. P50 build cost "+fD(bc.p50)+", P80 "+fD(bc.p80)+"; the budget, with "+contingency+"% contingency, covers the build about "+Math.round(bc.coverage)+"% of the time"+(bc.suggested!==contingency?" (P80 needs "+bc.suggested+"%)":"")+"."]:[]),
         ...(facts?(()=>{const lc=t=>t[0].toLowerCase()+t.slice(1);return["Site work is estimated from site facts — foundation: "+lc(sf.why.foundation)+"; grading and access: "+lc(sf.why.sitePrep)+"; utilities: "+lc(sf.why.utilTrench)+"; electrical: "+lc(sf.why.electrical)+"; surveys: "+lc(sf.why.surveys)+"."]})():[]),
         "Rent is the figure entered. The ADU's value is estimated at "+grm+"× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
@@ -1584,6 +1638,9 @@ function App(){
         <Section title="Value & selling" open={openSec.value} onToggle={()=>toggleSec("value")} summary={<><span style={{fontSize:openSec.value?18:15,fontFamily:"'Fraunces',serif",fontWeight:700,color:tb}}>{fD(ltrRent*grm)}</span><span style={{fontSize:12,color:"#8b949e"}}> when complete · {grm}× rent</span></>}>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <TS label={<>Value multiplier<IT align="left" text={"Estimates what the ADU adds to your property's value: this multiple × the monthly long-term rent (a gross rent multiplier, or GRM).\n\nAppraisers rely mainly on comparable sales and use the GRM as a cross-check. Low-cost markets run about 80–120×; expensive coastal markets 200–300×.\n\nValue drives Equity, Return and the net-equity chart, so set this for your market."}/></>} value={grm} onChange={set("grm")} typeMin={LIM.grm[0]} typeMax={LIM.grm[1]} min={50} max={400} step={5} format={v=>v+"× rent"} ticks={[{value:80,label:"Low-cost",color:tk},{value:110,label:"Typical",color:tb},{value:200,label:"Coastal",color:tk},{value:300,label:"Prime coastal",color:yl}]}/>
+            <TS label={<>Selling costs<IT align="left" text={"Agent commission plus closing costs, as a share of what the ADU adds to the sale price. Typical: 5–6% with traditional agents, less with a discount brokerage or a for-sale-by-owner sale."}/></>} value={sellCost} onChange={set("sellCost")} typeMin={LIM.sellCost[0]} typeMax={LIM.sellCost[1]} min={0} max={10} step={0.5} format={v=>v+"% of sale"} ticks={[{value:1,label:"By owner",color:gn},{value:3.5,label:"Discount agent",color:tk},{value:6,label:"Typical",color:tb},{value:8,label:"+ concessions",color:yl}]}/>
+            <TS label={<>Sell after<IT align="left" text={"Years of renting before a hypothetical sale, used for the 'What if you sold?' card in the Summary and the printed report."}/></>} value={saleYear} onChange={set("saleYear")} typeMin={LIM.saleYear[0]} typeMax={LIM.saleYear[1]} min={1} max={30} step={1} format={v=>v+" years of renting"} ticks={[{value:5,label:"5 yr",color:tk},{value:10,label:"10 yr",color:tb},{value:20,label:"20 yr",color:tk},{value:30,label:"30 yr",color:tk}]}/>
+            <div style={{fontSize:11,color:tb,lineHeight:1.45}}>If sold then: about {fD(cm.sale.proceeds)} from the sale and {(cm.sale.net>=0?"+":"")+fD(cm.sale.net)} overall after everything put in and taken out.</div>
           </div>
         </Section>
         </div>
@@ -1715,7 +1772,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} verdict={rep?rep.verdict:null} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} verdict={rep?rep.verdict:null} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>

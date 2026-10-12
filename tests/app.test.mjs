@@ -362,6 +362,37 @@ describe("site facts", () => {
   });
 });
 
+describe("what if you sold", () => {
+  const ledger = t => {
+    const part = t.match(/What if you sold\?(.*?)Stress tests/)[1];
+    const get = re => { const m = part.match(re); return m ? money(m[1]) : 0; };
+    return {
+      value: get(/adds to the sale price.*?([+−]\$[\d,]+)/), costs: get(/Selling costs \(\d+(?:\.\d)?%\).*?([+−]\$[\d,]+)/),
+      bal: get(/Pay off the remaining loan([+−]\$[\d,]+)/), recapture: get(/Depreciation recapture tax.*?([+−]\$[\d,]+)/),
+      nol: get(/losses released.*?([+−]\$[\d,]+)/), proceeds: get(/Cash from the sale(\$[\d,]+|−\$[\d,]+)/),
+      cash: get(/minus your down payment.*?([+−]\$[\d,]+)/), net: part.match(/What you'd walk away with.*?([+−]\$[\d.]+[kM]?)/)[1],
+    };
+  };
+  test("the ledger adds up", async () => {
+    const l = ledger((await load("?customRent=2600&cashDown=20&incomeTax=32&saleYear=8&view=consumer")).text());
+    assert.ok(l.bal < 0 && l.recapture < 0 && l.costs < 0, JSON.stringify(l));
+    assert.ok(Math.abs(l.value + l.costs + l.bal + l.recapture + l.nol - l.proceeds) <= 3, JSON.stringify(l));
+  });
+  test("selling at loan payoff with no costs or tax equals the full picture's total return", async () => {
+    const t = (await load("?customRent=2600&cashDown=20&saleYear=10&sellCost=0&view=consumer")).text();
+    const picture = t.match(/Total return[^+−]*([+−]\$[\d.]+k)✓/)[1];
+    assert.equal(ledger(t).net, picture);
+  });
+  test("recapture only with income tax; selling costs and sale year are set in Value & selling", async () => {
+    assert.doesNotMatch((await load("?customRent=2600&saleYear=8&view=consumer")).text(), /Depreciation recapture tax/);
+    const f = (await load("?customRent=2600&sellCost=4")).text();
+    assert.match(f, /Value & selling.*Selling costs.*4% of sale.*Sell after.*10 years of renting.*If sold then: about \$[\d,]+ from the sale/);
+  });
+  test("the report includes the sale scenario", async () => {
+    assert.match((await load("?customRent=2600&saleYear=12")).report().textContent, /If sold after 12 years of renting: .* leaves \$[\d,]+ — a net gain of/);
+  });
+});
+
 describe("tax loss carryover", () => {
   const taxTotal = r => {
     const table = [...r.querySelectorAll("table")].at(-1);
