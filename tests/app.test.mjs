@@ -99,7 +99,7 @@ describe("saved model and share links", () => {
     const p = await load("?customRent=3333&view=consumer", { stored: saved });
     assert.equal(p.doc.querySelector("#cRent").value, "3333");
     assert.equal(p.saved().customRent, 2777);
-    await p.click("Internal");
+    await p.click("Full model");
     assert.equal(p.saved().customRent, 2777, "switching tabs is not an edit");
     await p.type("#rentAmt", "3400");
     assert.equal(p.saved().customRent, 3400);

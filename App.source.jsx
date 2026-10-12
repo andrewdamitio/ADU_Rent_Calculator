@@ -317,7 +317,7 @@ const SRC=[
 {t:"ADU HELOC 125% CLTV — Patelco",u:"https://www.patelco.org/credit-cards-and-loans/home-equity/adu-line-of-credit",n:"Future-value-based HELOC products — the 125% CLTV is unusual in the broader market."},
 {t:"Freddie Mac Primary Mortgage Market Survey",u:"https://www.freddiemac.com/pmms",n:"Weekly 30-year fixed mortgage rate benchmark used for the broader rate context (HELOCs and renovation loans typically run +100–200 bps above PMMS)."},
 {t:"CalHFA ADU Grant Program — California Housing Finance Agency",u:"https://www.calhfa.ca.gov/adu/",n:"Up to $40,000 in pre-development cost grants for income-qualified homeowners. The model does NOT include this — output is conservative for CA homeowners eligible for the program."},
-{t:"Fannie Mae Selling Guide on ADU Income — B3-3.1-08",u:"https://selling-guide.fanniemae.com/sel/b3-3.1-08/rental-income",n:"Federal underwriting guidance on counting ADU rental income in DTI calculations. Informs the financing-feasibility framing in the consumer view."},
+{t:"Fannie Mae Selling Guide on ADU Income — B3-3.1-08",u:"https://selling-guide.fanniemae.com/sel/b3-3.1-08/rental-income",n:"Federal underwriting guidance on counting ADU rental income in DTI calculations. Informs the financing-feasibility framing in the Summary view."},
 ]},
 {cat:"Short-Term Rental & Hybrid Strategy",links:[
 {t:"ADU Airbnb Income by City — Maxable",u:"https://maxablespace.com/adu-airbnb/",n:"STR nightly rate benchmarks by metro — informs the ADR tick marks ($75–$300/night)."},
@@ -332,7 +332,7 @@ const SRC=[
 {cat:"Construction Timelines",links:[
 {t:"How Long Does It Take to Build an ADU? — Maxable",u:"https://maxablespace.com/how-long-does-it-take-to-build-an-adu/",n:"6–9 month typical timelines; supports the 6-month default."},
 {t:"ADU Permit Timeline California 2026 — Verified ADU",u:"https://verifiedadu.com/adu-permit-timeline-california/",n:"Permit-to-completion timing including the SB 9 60-day streamlining."},
-{t:"Prefab ADU Timeline: Abodu vs. Stick-Built — Abodu",u:"https://www.abodu.com/blog/how-long-does-it-take-to-build-an-adu",n:"Prefab can compress to 3–4 months; informs the 'fast-track' tick at 4mo."},
+{t:"Prefab ADU Timeline: Abodu vs. Stick-Built — Abodu",u:"https://www.abodu.com/blog/how-long-does-it-take-to-build-an-adu",n:"Prefab can compress to 3–4 months; informs the 'Prefab' tick at 4mo."},
 ]},
 {cat:"Solar Loan Comparison (Origination Fee Model)",links:[
 {t:"Solar Dealer Fee Explained — EnergySage",u:"https://www.energysage.com/solar/financing/dealer-fees/",n:"10–30% dealer-fee model — the analog for the optional origination-fee toggle in the financing card."},
@@ -384,7 +384,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
       </div>
     </div>
 
-    {/* RENT YOU'D CHARGE — same state as the Internal view */}
+    {/* RENT YOU'D CHARGE — same state as the Full model */}
     <div style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+(isSTR?"#94a3b8":LT.info),opacity:isSTR?0.5:1,pointerEvents:isSTR?"none":"auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,gap:12,flexWrap:"wrap"}}>
         <h3 style={{margin:0,fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,fontFamily:"inherit"}}>What would you charge for rent?</h3>
@@ -434,11 +434,11 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
     </div>
 
     {loanAmt>0?(<>
-    {/* INTEREST RATE — read-only here; only adjustable in the Internal view */}
+    {/* INTEREST RATE — read-only here; only adjustable in the Full model */}
     <div style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
       <div>
         <div style={{fontSize:12,color:LT.body,marginBottom:2}}>Interest rate on your loan</div>
-        <div style={{fontSize:11,color:LT.muted}}>Fixed for this estimate — adjustable only in the Internal view.</div>
+        <div style={{fontSize:11,color:LT.muted}}>Fixed for this estimate — adjustable in the Full model.</div>
       </div>
       <span style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:LT.text}}>{rate.toFixed(1)}%</span>
     </div>
@@ -542,7 +542,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
           </div>
           <div style={{opacity:taxActive?1:0.4}}>
             <div style={rowL}>
-              <span style={{fontSize:12.5,color:taxActive?LT.body:LT.muted}}>Income tax <span style={{fontSize:11,color:LT.muted}}>{taxActive?"("+incomeTax+"% marginal rate)":"(not modeled — set rate in Internal view)"}</span></span>
+              <span style={{fontSize:12.5,color:taxActive?LT.body:LT.muted}}>Income tax <span style={{fontSize:11,color:LT.muted}}>{taxActive?"("+incomeTax+"% marginal rate)":"(not modeled — set a rate in the Full model)"}</span></span>
               <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:taxActive?LT.neg:LT.muted,whiteSpace:"nowrap"}}>{taxActive?"−"+fD(b.incomeTax)+"/mo":"$0"}</span>
             </div>
             <div style={track}><div style={{height:"100%",background:taxActive?"#ef4444":"#cbd5e1",borderRadius:6,width:taxActive?`${(b.incomeTax/maxBar)*100}%`:"0%",transition:"width 0.3s",opacity:0.7}}/></div>
@@ -726,9 +726,9 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Construction costs</strong> are built up from line-item components (structure, foundation, site work, permits, fees, design, surveys) at 2026 mid-range defaults, plus a builder/GC margin. Garage conversions, prefab units, and high-cost markets are reflected via slider tick marks. Costs vary substantially by region and site conditions — adjust the sliders to match local builder quotes.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Property value</strong> uses a gross rent multiplier of 110× monthly rent — a heuristic widely cited by lenders and builders. Real appraisals use comparable sales as the primary method, and multipliers can vary substantially by market: low-cost regions trend toward 80–120×, while expensive coastal markets often run 200–300×. The 110× default is conservative for high-rent metros.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Operating expenses</strong> include property tax (with annual escalator), insurance (scaled to ADU replacement cost, with annual escalator), vacancy, maintenance reserve, and property management. Escalator defaults reflect recent 2020–2025 trends and vary by jurisdiction.</div>
-        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Income tax</strong> is modeled on US Schedule E: rental income minus loan interest, depreciation (27.5-year straight-line on the ADU cost basis, excluding furnishings), and operating expenses. Paper losses are not credited against other income. Default rate is 0% (not modeled); the Internal view's marginal-tax slider applies your combined federal + state rate. Passive activity loss rules and depreciation recapture at sale are not modeled.</div>
+        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Income tax</strong> is modeled on US Schedule E: rental income minus loan interest, depreciation (27.5-year straight-line on the ADU cost basis, excluding furnishings), and operating expenses. Paper losses are not credited against other income. Default rate is 0% (not modeled); the Full model's marginal-tax slider applies your combined federal + state rate. Passive activity loss rules and depreciation recapture at sale are not modeled.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Cash flow simulation</strong> runs month by month from project start: the construction period, then rent and loan payments together, with rent growth, expense escalation, and tax effects compounded monthly. Every figure on this page comes from that one simulation. Loan amortization uses the standard mortgage formula. Payback is when your cumulative cash position — down payment plus every month's net cash flow after loan payments and tax — returns to zero. Annual returns are compound rates.</div>
-        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Construction financing</strong> follows standard draw practice: design, permits, fees and surveys are paid up front; your cash goes in before the lender funds anything; the lender then funds hard costs in monthly draws along an S-curve as work is inspected, holding back 5% retention until completion; furnishings are bought at the end. Interest accrues only on what's been drawn and is either paid monthly, added to the loan, or not charged, as set in the Internal view. Construction interest is capitalized into the depreciation basis for taxes.</div>
+        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Construction financing</strong> follows standard draw practice: design, permits, fees and surveys are paid up front; your cash goes in before the lender funds anything; the lender then funds hard costs in monthly draws along an S-curve as work is inspected, holding back 5% retention until completion; furnishings are bought at the end. Interest accrues only on what's been drawn and is either paid monthly, added to the loan, or not charged, as set in the Full model. Construction interest is capitalized into the depreciation basis for taxes.</div>
         <div><strong style={{color:LT.text}}>Limitations.</strong> The model does not capture construction cost overruns, regulatory changes, mortgage refinancing, depreciation recapture at sale, transaction costs at exit, jurisdiction-specific fees or incentives, short-term rental restrictions, or interactions with existing zoning. Always consult a tax professional and your local building department before committing capital.</div>
       </div>}
     </div>
@@ -737,7 +737,7 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
 
 function App(){
   // Initial state is read synchronously (localStorage is synchronous) so there's no loading flash.
-  // A shared link wins over the saved model; otherwise the saved model loads into the Internal view.
+  // A shared link wins over the saved model; otherwise the saved model loads into the Full model.
   const[init]=useState(()=>{
     const shared=shareParamsFromLocation();
     if(shared)return{state:{...DEF,...shared},shared:true};
@@ -839,7 +839,7 @@ function App(){
   const roi=annualized(ret,total,horizonYrs);
   const roiCash=cashDownAmt>0?annualized(ret,cashDownAmt,horizonYrs):null;
 
-  // First-month (year-1) snapshot for the Internal metric cards.
+  // First-month (year-1) snapshot for the Full model's metric cards.
   const r={rent:grossY1,net:first.noi,sur:first.noi-loanPmt,cov:loanPmt>0?(first.noi/loanPmt)*100:null,cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,eq:ltrRent*110,ret,roi};
   // Share of gross rent that goes to vacancy, opex, property tax and insurance — for the user's rent.
   const expPct=grossY1>0?Math.round(((grossY1-first.noi)/grossY1)*100):0;
@@ -890,12 +890,12 @@ function App(){
         {/* VIEW SWITCHER — always visible; the primary choice on this page */}
         <div className="no-print" role="tablist" aria-label="View mode" style={{display:"flex",gap:6,marginBottom:22,padding:5,borderRadius:14,border:"1px solid "+(dark?"#30363d":"#cbd5e1"),background:dark?"#0d1117":"#eef2f7"}}>
           <button type="button" role="tab" aria-selected={view==="internal"} onClick={()=>set("view")("internal")} style={{flex:1,padding:"12px 8px",borderRadius:10,cursor:"pointer",userSelect:"none",border:"none",fontFamily:"inherit",transition:"background 0.15s",background:view==="internal"?tb:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-            <span style={{fontSize:14,fontWeight:700,color:view==="internal"?"#0d1117":(dark?"#8b949e":"#64748b")}}>Internal</span>
-            <span style={{fontSize:11,fontWeight:500,color:view==="internal"?"rgba(13,17,23,0.7)":(dark?"#6e7681":"#94a3b8")}}>Full model, every assumption</span>
+            <span style={{fontSize:14,fontWeight:700,color:view==="internal"?"#0d1117":(dark?"#8b949e":"#64748b")}}>Full model</span>
+            <span style={{fontSize:11,fontWeight:500,color:view==="internal"?"rgba(13,17,23,0.7)":(dark?"#6e7681":"#94a3b8")}}>Every assumption, adjustable</span>
           </button>
           <button type="button" role="tab" aria-selected={view==="consumer"} onClick={()=>set("view")("consumer")} style={{flex:1,padding:"12px 8px",borderRadius:10,cursor:"pointer",userSelect:"none",border:"none",fontFamily:"inherit",transition:"background 0.15s",background:view==="consumer"?LT.info:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-            <span style={{fontSize:14,fontWeight:700,color:view==="consumer"?"#fff":(dark?"#8b949e":"#64748b")}}>Consumer view</span>
-            <span style={{fontSize:11,fontWeight:500,color:view==="consumer"?"rgba(255,255,255,0.8)":(dark?"#6e7681":"#94a3b8")}}>Clean summary to share</span>
+            <span style={{fontSize:14,fontWeight:700,color:view==="consumer"?"#fff":(dark?"#8b949e":"#64748b")}}>Summary</span>
+            <span style={{fontSize:11,fontWeight:500,color:view==="consumer"?"rgba(255,255,255,0.8)":(dark?"#6e7681":"#94a3b8")}}>Clean results to share</span>
           </button>
         </div>
 
@@ -1002,7 +1002,7 @@ function App(){
               )}
             </div>
             <div style={{borderTop:"1px solid #21262d",marginTop:10,paddingTop:8}}>
-              <TS label={<>Construction period<IT align="left" text={"Months from permit approval to first rent check. Regular loan payments start when the ADU is finished; until then there's no rent, and interest on the funds drawn so far is set below.\n\nAll results are measured from project start, so a longer build pushes every result "+buildMonths+" months later."}/></>} value={buildMonths} onChange={set("buildMonths")} min={0} max={18} step={1} format={v=>v===0?"Instant (prefab)":v+" months"} ticks={[{value:0,label:"Prefab",color:gn},{value:4,label:"Fast-track",color:tb},{value:6,label:"Typical",color:tk},{value:10,label:"Stick-built",color:yl},{value:15,label:"+permit delays",color:rd}]}/>
+              <TS label={<>Construction period<IT align="left" text={"Months from permit approval to first rent check. Regular loan payments start when the ADU is finished; until then there's no rent, and interest on the funds drawn so far is set below.\n\nAll results are measured from project start, so a longer build pushes every result "+buildMonths+" months later."}/></>} value={buildMonths} onChange={set("buildMonths")} min={0} max={18} step={1} format={v=>v===0?"None (already built)":v+" months"} ticks={[{value:0,label:"Already built",color:gn},{value:4,label:"Prefab",color:tb},{value:6,label:"Typical",color:tk},{value:10,label:"Stick-built",color:yl},{value:15,label:"+permit delays",color:rd}]}/>
               {loanAmt>0&&buildMonths>0&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
                 <div style={{fontSize:12,color:"#8b949e"}}>Interest during construction<IT align="left" text={"How construction financing works in this model:\n\nDesign, permits, utility fees and surveys are paid at the start. Your cash goes in first — lenders require it before they fund anything. The lender then funds the rest in monthly draws as work is completed and inspected, following the typical S-curve (slow start, fast framing and rough-in, slow finish work). 5% retention is held back until completion, and furnishings are bought at the end.\n\nYou pay interest only on what's been drawn, so the average balance during the build is typically 40–55% of the loan.\n\nHELOCs and most construction-to-permanent loans bill that interest monthly. Some lenders add it to the loan instead, which raises the permanent payment.\n\nFor taxes, construction interest is capitalized into the building's depreciation basis rather than deducted."}/></div>
                 <ModePills label="Interest during construction" value={conIntMode} onChange={set("conIntMode")} options={[{value:"paid",label:"Paid monthly"},{value:"cap",label:"Added to loan"},{value:"none",label:"Not charged"}]}/>
@@ -1041,7 +1041,7 @@ function App(){
               <label htmlFor="rentLoc" style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Label <span style={{textTransform:"none",letterSpacing:0,color:"#6e7681"}}>(optional)</span></label>
               <input id="rentLoc" className="fld" type="text" value={customName} onChange={e=>set("customName")(e.target.value)} placeholder="e.g. Portland — Alberta" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"'DM Sans',sans-serif",width:210,outline:"none"}}/>
             </div>
-            <button type="button" onClick={()=>set("view")("consumer")} disabled={!hasCustom} style={{padding:"14px 26px",borderRadius:8,fontSize:15,fontWeight:600,letterSpacing:"0.01em",cursor:hasCustom?"pointer":"not-allowed",border:"1px solid "+(hasCustom?tb:"#30363d"),background:hasCustom?tb:"transparent",color:hasCustom?"#0d1117":"#6e7681",fontFamily:"inherit",transition:"background 0.15s, box-shadow 0.15s",boxShadow:hasCustom?"0 1px 10px rgba(88,166,255,0.28)":"none",whiteSpace:"nowrap",flexShrink:0}} onMouseEnter={e=>{if(hasCustom)e.currentTarget.style.background="#79b8ff"}} onMouseLeave={e=>{if(hasCustom)e.currentTarget.style.background=tb}}>Open consumer view →</button>
+            <button type="button" onClick={()=>set("view")("consumer")} disabled={!hasCustom} style={{padding:"14px 26px",borderRadius:8,fontSize:15,fontWeight:600,letterSpacing:"0.01em",cursor:hasCustom?"pointer":"not-allowed",border:"1px solid "+(hasCustom?tb:"#30363d"),background:hasCustom?tb:"transparent",color:hasCustom?"#0d1117":"#6e7681",fontFamily:"inherit",transition:"background 0.15s, box-shadow 0.15s",boxShadow:hasCustom?"0 1px 10px rgba(88,166,255,0.28)":"none",whiteSpace:"nowrap",flexShrink:0}} onMouseEnter={e=>{if(hasCustom)e.currentTarget.style.background="#79b8ff"}} onMouseLeave={e=>{if(hasCustom)e.currentTarget.style.background=tb}}>Open summary →</button>
           </div>
           </>)}
         </div>
