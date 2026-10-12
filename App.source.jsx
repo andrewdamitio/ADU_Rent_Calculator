@@ -179,7 +179,7 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,cmpOn:false,
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,clientName:"",clientAddr:"",prepName:"",prepCompany:"",reportNotes:"",cmpOn:false,
   cmpBOn:true,cmpBName:"30-yr cash-out refi",cmpBRate:7,cmpBTerm:30,cmpBDown:0,cmpBFee:3,
   cmpCOn:true,cmpCName:"HELOC, 20 yr",cmpCRate:8.5,cmpCTerm:20,cmpCDown:0,cmpCFee:0,
   cmpDOn:true,cmpDName:"All cash",cmpDRate:0,cmpDTerm:10,cmpDDown:100,cmpDFee:0,hookupCity:"ca",saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
@@ -211,7 +211,7 @@ function cleanField(k,raw){
   }
   if(ENUMS[k])return ENUMS[k].includes(raw)?raw:undefined;
   if(k==="firm")return typeof raw==="string"&&/^[eqk]{11}$/.test(raw)?raw:undefined;
-  return typeof raw==="string"?raw.slice(0,200):undefined;
+  return typeof raw==="string"?raw.slice(0,k==="reportNotes"?1200:200):undefined;
 }
 function cleanState(src){
   const out={};
@@ -679,14 +679,16 @@ function PrintReport({rep}){
         <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:RP.accent}}>ADU Investment Analysis</div>
         <div style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,lineHeight:1.15,marginTop:2}}>{rep.title}</div>
         <div style={{fontSize:10.5,color:RP.body,marginTop:3}}>{rep.subtitle}</div>
+        {rep.preparedFor&&<div style={{fontSize:10.5,color:RP.ink,marginTop:3}}>Prepared for <strong>{rep.preparedFor}</strong></div>}
       </div>
       <div style={{textAlign:"right",fontSize:9.5,color:RP.muted,lineHeight:1.5}}>
-        <div>Prepared {rep.date}</div>
+        <div>Prepared {rep.date}{rep.preparedBy?" by "+rep.preparedBy:""}</div>
         <div>Estimate — not an appraisal or offer of credit</div>
       </div>
     </div>
 
     <p style={{fontSize:11.5,lineHeight:1.55,margin:"12px 0 14px",color:RP.ink}}>{rep.verdict}</p>
+    {rep.clientNotes&&<div style={{margin:"0 0 14px",padding:"8px 12px",borderLeft:"3px solid "+RP.accent,background:RP.band,fontSize:10,lineHeight:1.5,color:RP.body,whiteSpace:"pre-wrap"}}><strong style={{color:RP.ink}}>Notes{rep.preparedBy?" from "+rep.preparedBy:""}: </strong>{rep.clientNotes}</div>}
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",border:"1px solid "+RP.rule,borderRadius:4}}>
       {kpis.map(([k,v,s],i)=>(<div key={k} style={{padding:"9px 12px",borderRight:i%3<2?"1px solid "+RP.rule:"none",borderBottom:i<3?"1px solid "+RP.rule:"none"}}>
@@ -743,7 +745,7 @@ function PrintReport({rep}){
           <td style={{...td,color:i===0?RP.muted:RP.neg}}>{i===0?"—":fShort(t.ret-cm.stress[0].ret)}</td>
         </tr>))}</tbody>
       </table>
-      {rep.cmp&&<><H2>Financing options compared</H2><FinCompareTable cols={rep.cmp} theme="print"/><div style={{fontSize:9,color:RP.muted,marginTop:4}}>Same project, different financing; best figure per row highlighted. Rates are estimates — confirm with lenders.</div></>}
+      {rep.cmp&&<div style={{breakInside:"avoid"}}><H2>Financing options compared</H2><FinCompareTable cols={rep.cmp} theme="print"/><div style={{fontSize:9,color:RP.muted,marginTop:4}}>Same project, different financing; best figure per row highlighted. Rates are estimates — confirm with lenders.</div></div>}
       <div style={{fontSize:9,color:RP.muted,marginTop:4}}>Each test changes one assumption and holds the rest.{cm.stress.some(t=>t.cfAtTerm)?" * Positive only once the loan is paid off.":""}</div>
     </div>
 
@@ -913,7 +915,7 @@ const fieldLabel={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpa
 const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color:LT.text,whiteSpace:"nowrap"};
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
-function ConsumerView({cm,costRange,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,costRange,preparedFor,preparedBy,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);const[showParts,setShowParts]=useState(false);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -921,6 +923,7 @@ function ConsumerView({cm,costRange,cmpCols,verdict,saleOn,setSaleOn,saleYear,se
   return(<>
     <PageHeader title="Your ADU Investment Summary" copied={copied} onCopy={copyShare}
       subtitle={sqft+" sq ft "+utype.toLowerCase()+" "+unitNoun+" · "+(origFeeAmt>0?fD(assetCost)+" to build + "+fD(origFeeAmt)+" loan fee = "+fD(total)+" project":fD(total)+" project")+" · "+(loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash")}/>
+    {(preparedFor||preparedBy)&&<div style={{fontSize:12.5,color:LT.muted,marginTop:-16,marginBottom:20}}>{preparedFor&&<>Prepared for <strong style={{color:LT.body}}>{preparedFor}</strong></>}{preparedFor&&preparedBy?" · ":""}{preparedBy&&<>Prepared by <strong style={{color:LT.body}}>{preparedBy}</strong></>}</div>}
     {/* THE SHORT ANSWER — the verdict first, before any inputs */}
     {verdict&&(
       <div style={{...ltCard,padding:"20px 24px",marginBottom:16,borderLeft:"4px solid "+(cm.ret>=0?LT.pos:LT.neg)}}>
@@ -1332,7 +1335,7 @@ function App(){
     return{state:DEF,shared:false};
   });
   const[state,setState]=useState(init.state);const[showSources,setShowSources]=useState(false);const[showHow,setShowHow]=useState(false);const[copied,setCopied]=useState(false);const[confirmReset,setConfirmReset]=useState(false);
-  const[openSec,setOpenSec]=useState({costs:true,financing:true,revenue:true,taxes:true,value:true});
+  const[openSec,setOpenSec]=useState({costs:true,financing:true,revenue:true,taxes:true,value:true,details:false});
   const toggleSec=k=>setOpenSec(s=>({...s,[k]:!s[k]}));
   const resetTimerRef=useRef(null);
   // True while viewing a shared link that the visitor hasn't edited. Saving is held
@@ -1361,7 +1364,7 @@ function App(){
   const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,...PTYPES[t].f,projectType:t}))},[]);
   // Switching to dollar amounts starts the sliders at what the site facts produced, so nothing jumps.
   const setSiteMode=useCallback(m=>{fromShareRef.current=false;setState(s=>m==="dollars"&&s.siteMode!=="dollars"?{...s,siteMode:m,...siteDollars(siteFromFacts(s,s.sqft))}:{...s,siteMode:m})},[]);
-  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,hookupCity,saleOn,saleYear,sellCost,incomeTax,lossCarry,firmOn,firm,customRent,customName,view}=state;
+  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,clientName,clientAddr,prepName,prepCompany,reportNotes,hookupCity,saleOn,saleYear,sellCost,incomeTax,lossCarry,firmOn,firm,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const ptype=PTYPES[projectType]||PTYPES.detached;
   // Site work: from the site facts, or the dollar sliders when the user prefers to enter amounts.
@@ -1525,6 +1528,8 @@ function App(){
     }
   };
   const dark=view!=="consumer";
+  const preparedFor=[clientName.trim(),clientAddr.trim()].filter(Boolean).join(" · ");
+  const preparedBy=[prepName.trim(),prepCompany.trim()].filter(Boolean).join(", ");
 
   // Data for the printed report (both views print the same report).
   const pct=v=>(Math.round(v*10)/10).toString();
@@ -1544,7 +1549,7 @@ function App(){
       cm,title:customName||unit,
       subtitle:(customName?unit+" · ":"")+strategy[0].toUpperCase()+strategy.slice(1)+" · "+fD(grossY1)+"/mo "+(isSTR?"projected revenue":"rent")+" in year 1",
       date:new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"}),
-      total,loanAmt,cashDownAmt,cashDown,loanPmt,rate,term,evalYrs,incomeTax,buildMonths,verdict,cmp:mdl.cmp,costRange,
+      total,loanAmt,cashDownAmt,cashDown,loanPmt,rate,term,evalYrs,incomeTax,buildMonths,verdict,cmp:mdl.cmp,costRange,preparedFor,preparedBy,clientNotes:reportNotes.trim(),
       costRows:[
         ["Structure ("+sqft+" sq ft × $"+cpsf+")",buildCost],
         ["Site work",siteCost],
@@ -1760,6 +1765,18 @@ function App(){
             </div>}
           </div>
         </Section>
+
+        {/* 6. REPORT DETAILS — who it's for and who prepared it, for the printed report */}
+        <Section title="Report details" open={openSec.details} onToggle={()=>toggleSec("details")} summary={<span style={{fontSize:12,color:"#8b949e"}}>{clientName.trim()?"For "+clientName.trim():"Not filled in"}</span>}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,240px),1fr))",gap:12}}>
+            <label htmlFor="clientName" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Prepared for<input id="clientName" className="fld" type="text" value={clientName} onChange={e=>set("clientName")(e.target.value)} placeholder="Client name" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
+            <label htmlFor="clientAddr" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Property address<input id="clientAddr" className="fld" type="text" value={clientAddr} onChange={e=>set("clientAddr")(e.target.value)} placeholder="Street, city" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
+            <label htmlFor="prepName" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Prepared by<input id="prepName" className="fld" type="text" value={prepName} onChange={e=>set("prepName")(e.target.value)} placeholder="Your name" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
+            <label htmlFor="prepCompany" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Company<input id="prepCompany" className="fld" type="text" value={prepCompany} onChange={e=>set("prepCompany")(e.target.value)} placeholder="Company (optional)" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
+          </div>
+          <label htmlFor="reportNotes" style={{display:"flex",flexDirection:"column",gap:4,marginTop:12,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Notes for the client<textarea id="reportNotes" className="fld" rows={4} value={reportNotes} onChange={e=>set("reportNotes")(e.target.value.slice(0,1200))} placeholder="Site-specific caveats, what's included or excluded, next steps…" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"8px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,lineHeight:1.5,resize:"vertical",outline:"none"}}/></label>
+          <div style={{fontSize:11,color:"#6e7681",marginTop:8,lineHeight:1.45}}>Shown on the printed report and the Summary. These details are saved in this browser and included in model links — leave them out of links you post publicly.</div>
+        </Section>
         </div>
 
         <div className="int-results">
@@ -1884,7 +1901,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} costRange={costRange} cmpCols={mdl.cmp} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} costRange={costRange} preparedFor={preparedFor} preparedBy={preparedBy} cmpCols={mdl.cmp} verdict={rep?rep.verdict:null} saleOn={saleOn} setSaleOn={set("saleOn")} saleYear={saleYear} setSaleYear={set("saleYear")} rentY1={grossY1} assetCost={assetCost} origFeeAmt={origFeeAmt} origFee={origFee} costSteps={costSteps} ptypeKey={projectType} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>
