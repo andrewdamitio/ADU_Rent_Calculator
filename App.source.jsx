@@ -456,7 +456,8 @@ function useWidth(ref,fallback){
 // Year-based line chart used by both consumer charts. pts: [{year,...values,label?,hidden?}] —
 // years may be fractional; hidden points shape the line but get no dot or hover target.
 // series: [{key,color,width,dash,opacity}]; the first series is the interactive one.
-function TimeChart({pts,series,area,pointColor,vlines=[],marker,tooltip,height=230,ariaLabel}){
+// band: {to, label} shades years 0 → to (the construction period) and labels it.
+function TimeChart({pts,series,area,pointColor,vlines=[],marker,tooltip,height=230,ariaLabel,band}){
   const wrapRef=useRef(null);const W=useWidth(wrapRef,820);const uid=useId().replace(/:/g,"");
   const[hov,setHov]=useState(null);const[pin,setPin]=useState(false);
   const narrow=W<520,FS=narrow?11:12;
@@ -490,6 +491,7 @@ function TimeChart({pts,series,area,pointColor,vlines=[],marker,tooltip,height=2
       <line x1={PL} y1={zeroY} x2={W-PR} y2={zeroY} stroke="#64748b" strokeWidth="1"/>
       <path d={areaD} fill={"url(#"+uid+"p)"} clipPath={"url(#"+uid+"a)"}/>
       <path d={areaD} fill={"url(#"+uid+"n)"} clipPath={"url(#"+uid+"b)"}/>
+      {band&&band.to>0&&<g><rect x={xC(0)} y={PT} width={Math.max(2,xC(band.to)-xC(0))} height={cH} fill="#94a3b8" opacity="0.16"/><text x={xC(0)+4} y={PT+cH-6} fontSize={FS} fill="#64748b" stroke="#fff" strokeWidth="3" paintOrder="stroke">{band.label}</text></g>}
       {series.slice(1).map(s=><path key={s.key} d={path(s.key)} fill="none" stroke={s.color} strokeWidth={s.width||1.5} strokeDasharray={s.dash||""} opacity={s.opacity||1}/>)}
       <path d={mainD} fill="none" stroke={series[0].color} strokeWidth={series[0].width||2.5} strokeLinejoin="round"/>
       {vlines.map((v,i)=>v.x>0&&v.x<=xMax&&<g key={i}><line x1={xC(v.x)} y1={PT} x2={xC(v.x)} y2={PT+cH} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4,3"/><text x={xC(v.x)} y={PT-7} textAnchor="middle" fontSize={FS} fill="#64748b">{v.label}</text></g>)}
@@ -716,8 +718,8 @@ function PrintReport({rep}){
         marker={cm.po>0&&cm.po!==Infinity?{x:cm.po,label:"Payback yr "+cm.po.toFixed(1),color:"#15803d"}:null}
         tooltip={()=>null}/>
       <H2>Net equity over time</H2>
-      <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Estimated ADU value, minus loan balance, plus cash position.</div>
-      <TimeChart pts={cm.pts} height={210} ariaLabel="Net equity by year"
+      <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Estimated ADU value, minus loan balance, plus cash position.{rep.buildMonths>0?" The ADU is valued at $0 until it's finished (shaded build period), since a half-built ADU can't be rented or appraised the normal way.":""}</div>
+      <TimeChart pts={cm.pts} height={210} band={rep.buildMonths>0?{to:rep.buildMonths/12,label:"Building — not valued yet"}:null} ariaLabel="Net equity by year"
         series={[{key:"tot",color:RP.accent,width:2.5},{key:"value",color:"#b45309",dash:"2,4",opacity:0.8},{key:"loanNeg",color:"#b91c1c",dash:"4,3",opacity:0.7},{key:"cash",color:"#15803d",dash:"4,3",opacity:0.8}]}
         area={{pos:RP.accent,neg:RP.accent}} vlines={rep.loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]} tooltip={()=>null}/>
       <div style={{display:"flex",gap:16,fontSize:9,color:RP.muted,marginTop:2}}>
@@ -1100,8 +1102,8 @@ function ConsumerView({cm,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,u
     {/* NET EQUITY POSITION */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:4}}>Net equity position over time</div>
-      <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Total wealth created by the ADU at any point — asset value <strong style={{color:LT.info}}>minus</strong> remaining loan balance <strong style={{color:LT.info}}>plus</strong> your cash position. After the loan is paid off, the payment becomes income and growth accelerates.</div>
-      <TimeChart pts={cm.pts} height={250} ariaLabel="Net equity, ADU value, loan balance and cash position by year"
+      <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Total wealth created by the ADU at any point — asset value <strong style={{color:LT.info}}>minus</strong> remaining loan balance <strong style={{color:LT.info}}>plus</strong> your cash position. After the loan is paid off, the payment becomes income and growth accelerates.{buildMonths>0?" During the "+buildMonths+"-month build (shaded) the ADU's value stays at $0 — a half-built ADU can't be rented or appraised the normal way — so net equity dips while money goes out, then jumps when it's finished.":""}</div>
+      <TimeChart pts={cm.pts} height={250} band={buildMonths>0?{to:buildMonths/12,label:"Building — not valued yet"}:null} ariaLabel="Net equity, ADU value, loan balance and cash position by year"
         series={[{key:"tot",color:"#2563eb",width:3},...(showParts?[{key:"value",color:"#d97706",dash:"2,4",opacity:0.6},{key:"loanNeg",color:"#ef4444",dash:"4,3",opacity:0.5},{key:"cash",color:"#16a34a",dash:"4,3",opacity:0.55}]:[])]}
         area={{pos:"#2563eb",neg:"#2563eb"}}
         vlines={loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]}

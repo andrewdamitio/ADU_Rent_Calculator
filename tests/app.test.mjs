@@ -240,6 +240,17 @@ describe("construction-period interest", () => {
   });
 });
 
+describe("build period on the net-equity chart", () => {
+  test("is shaded and explained when there's a build, and absent when there isn't", async () => {
+    const p = await load("?customRent=2600&view=consumer");
+    assert.match(p.text(), /During the 6-month build \(shaded\) the ADU's value stays at \$0 — a half-built ADU can't be rented or appraised the normal way/);
+    assert.match(p.doc.querySelectorAll(".screen-only svg[role=img]")[1].textContent, /Building — not valued yet/);
+    assert.match(p.report().textContent, /The ADU is valued at \$0 until it's finished \(shaded build period\)/);
+    const none = await load("?customRent=2600&buildMonths=0&view=consumer");
+    assert.doesNotMatch(none.text(), /shaded|Building — not valued yet/);
+  });
+});
+
 describe("water & sewer ticks by city", () => {
   const row = t => t.match(/Water & sewer fees\?.*?Tick marks for/)[0];
   test("California by default; each city swaps in its official figures", async () => {
