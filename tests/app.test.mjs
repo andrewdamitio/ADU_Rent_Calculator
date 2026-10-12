@@ -165,6 +165,13 @@ describe("cost model", () => {
     const dep = async f => money((await load(`?customRent=2600&furnishing=${f}&conIntMode=none`)).text().match(/depreciation \((\$[\d,]+)\/yr/)[1]);
     assert.equal(await dep(0), await dep(10000));
   });
+  test("insurance is on the building's rebuild cost, not fees or site work", async () => {
+    const ins = async qs => money((await load("?customRent=2600" + qs)).text().match(/Insurance \((\$[\d,]+)\/yr\)/)[1]);
+    // (600 sq ft × $300 structure + $10,000 foundation) × 1.20 builder margin × 0.5%
+    assert.equal(await ins(""), 1140);
+    assert.equal(await ins("&permits=25000&hookup=30000&furnishing=10000"), 1140);
+    assert.equal(await ins("&cpsf=350"), Math.round((600 * 350 + 10000) * 1.2 * 0.005));
+  });
   test("contingency is its own line, not part of soft costs", async () => {
     const t = (await load("?customRent=2600")).text();
     // permits 10,000 + water/sewer 8,000 + design 8,000 + surveys 3,500 + furnishing 0
