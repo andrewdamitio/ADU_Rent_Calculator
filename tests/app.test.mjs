@@ -354,42 +354,66 @@ describe("site facts", () => {
 
 describe("budget confidence", () => {
   const panel = t => {
-    const m = t.match(/Quoted or known(\d+)%of the budgetLine-item uncertainty±(\$[\d,]+)likely spread of the totalSuggested contingency(\d+)%of hard costs · you have (\d+)%/);
-    return m && { firmed: +m[1], spread: money(m[2]), suggested: +m[3], have: +m[4] };
+    const m = t.match(/Quoted or known(\d+)%of the line-item budgetP50 \/ P80 build cost(\$[\d,]+) \/ (\$[\d,]+)50% \/ 80% chance it costs lessYour budget holds(?:≈ )?(\d+)%of the time, with (\d+)% contingencyContingency for P80(\d+)%of hard costs/);
+    return m && { firmed: +m[1], p50: money(m[2]), p80: money(m[3]), holds: +m[4], have: +m[5], suggested: +m[6] };
+  };
+  // Independent re-derivation: each status is a 90% band; lines combine as independent normals.
+  const Z90 = 1.6449, Z80 = 0.8416, hard = 180000 + 10000 + 8000 + 8000 + 3000 + 2000;
+  const lines = [180000, 10000, 8000, 8000, 3000, 2000, 10000, 8000, 8000, 3500];
+  const expect = range => {
+    const base = lines.reduce((s, x) => s + x * 1.2, 0);
+    const sigma = Math.sqrt(lines.reduce((s, x, i) => s + (x * 1.2 * range[i] / Z90) ** 2, 0));
+    const phi = z => 0.5 * (1 + Math.sign(z) * Math.sqrt(1 - Math.exp(-2 * z * z / Math.PI)));   // close approximation
+    return { p50: base, p80: base + Z80 * sigma, suggested: Math.ceil(Z80 * sigma / hard * 100 - 1e-9), holds: sigma ? phi(10550 / sigma) * 100 : 100 };
   };
   test("is off by default", async () => {
     const t = (await load("?customRent=2600")).text();
     assert.match(t, /Track how firm each cost is/);
     assert.equal(panel(t), null);
   });
-  test("all estimates: 0% firm, 15% suggested, spread is the root-sum-square of ±25% lines", async () => {
-    const p = await load("?customRent=2600&firmOn=1");
-    const b = panel(p.text());
-    const lines = [180000, 10000, 8000, 8000, 3000, 2000, 10000, 8000, 8000, 3500];
-    const rss = Math.sqrt(lines.reduce((s, x) => s + (x * 1.2 * 0.25) ** 2, 0));
+  test("all estimates: P50/P80, coverage and the P80 contingency follow from ±25% bands", async () => {
+    const b = panel((await load("?customRent=2600&firmOn=1")).text());
+    const e = expect(lines.map(() => 0.25));
     assert.equal(b.firmed, 0);
-    assert.equal(b.suggested, 15);
-    assert.ok(Math.abs(b.spread - rss) <= 1, b.spread + " vs " + rss);
+    assert.equal(b.p50, 288600);
+    assert.ok(Math.abs(b.p80 - e.p80) <= 1, b.p80 + " vs " + e.p80);
+    assert.equal(b.suggested, e.suggested);
+    assert.ok(b.suggested >= 12 && b.suggested <= 15, "close to the 15% rule of thumb: " + b.suggested);
+    assert.ok(Math.abs(b.holds - e.holds) <= 1.5, b.holds + " vs " + e.holds);
+    assert.equal(b.have, 5);
   });
-  test("quotes and known prices firm up the budget and lower the suggestion", async () => {
-    assert.deepEqual((({ firmed, suggested }) => ({ firmed, suggested }))(panel((await load("?customRent=2600&firmOn=1&firm=qqqqqqqqqqq")).text())), { firmed: 100, suggested: 5 });
+  test("quotes and known prices firm up the budget and lower the P80 contingency", async () => {
+    const q = panel((await load("?customRent=2600&firmOn=1&firm=qqqqqqqqqqq")).text());
+    assert.equal(q.firmed, 100);
+    assert.equal(q.suggested, expect(lines.map(() => 0.10)).suggested);
+    assert.ok(q.suggested >= 4 && q.suggested <= 6, "close to the 5% rule of thumb: " + q.suggested);
+    assert.ok(q.holds >= 75, "5% contingency covers a fully quoted budget about 80% of the time: " + q.holds);
     const k = panel((await load("?customRent=2600&firmOn=1&firm=kkkkkkkkkkk")).text());
     assert.equal(k.suggested, 0);
-    assert.equal(k.spread, 0);
+    assert.equal(k.p80, k.p50);
+    assert.equal(k.holds, 100);
+  });
+  test("ranks what drives the uncertainty", async () => {
+    const t = (await load("?customRent=2600&firmOn=1")).text();
+    const m = t.match(/What drives the uncertainty — firm these up first(.*?)Each status is read/)[1];
+    assert.match(m, /^Structure \(estimate\)\d+%/, "structure dominates when everything is estimated");
+    const q = (await load("?customRent=2600&firmOn=1&firm=qeeeeeeeeee")).text().match(/What drives the uncertainty — firm these up first(.*?)Each status is read/)[1];
+    assert.match(q, /^Structure \(quote\)/, "still the biggest single line once quoted");
   });
   test("marking a line and applying the suggestion", async () => {
-    const p = await load("?customRent=2600&firmOn=1");
+    const p = await load("?customRent=2600&firmOn=1&contingency=1");
     const group = p.doc.querySelector("[role=radiogroup][aria-label='Structure firmness']");
     [...group.querySelectorAll("button")].find(b => b.textContent === "Quote").click(); await wait(60);
     assert.equal(p.saved().firm, "qeeeeeeeeee");
     const b = panel(p.text());
-    assert.ok(b.suggested < 15 && b.suggested > 5, "structure is most of the hard costs: " + b.suggested);
+    assert.ok(b.suggested < 13 && b.suggested >= 4, "quoting the structure cuts the contingency needed: " + b.suggested);
     await p.click("Use " + b.suggested + "% contingency");
     assert.equal(p.saved().contingency, b.suggested);
+    assert.ok(panel(p.text()).holds >= 80 && panel(p.text()).holds <= 85, "P80 contingency → holds at least 80% of the time: " + panel(p.text()).holds);
   });
   test("bad firmness strings in a link are ignored; the report notes it when on", async () => {
     assert.equal((await load("?customRent=2600&firmOn=1&firm=zz")).saved()?.firm ?? "eeeeeeeeeee", "eeeeeeeeeee");
-    assert.match((await load("?customRent=2600&firmOn=1")).report().textContent, /Budget confidence: 0% of line-item costs are quoted or known/);
+    assert.match((await load("?customRent=2600&firmOn=1")).report().textContent, /Budget confidence: 0% of line-item costs are quoted or known\. P50 build cost \$288,600, P80 \$[\d,]+; the budget, with 5% contingency, covers the build about \d+% of the time \(P80 needs \d+%\)\./);
   });
 });
 

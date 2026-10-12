@@ -294,28 +294,49 @@ function MethodSwitch({label,value,onChange,options}){
 const nested={marginTop:10,paddingLeft:14,borderLeft:"2px solid rgba(88,166,255,0.35)"};
 
 // Budget confidence (optional): mark each cost line as an estimate, a quote, or a known price.
-// Typical accuracy: a rough estimate lands within about ±25%, a contractor or city quote within
-// about ±10% (change orders, allowances), a fixed fee or signed fixed price is known. Contingency
-// practice follows the same split: ~15% on unquoted work, ~5% on quoted work, none on fixed prices.
-const FIRM={e:{label:"Estimate",range:0.25,cont:0.15},q:{label:"Quote",range:0.10,cont:0.05},k:{label:"Known",range:0,cont:0}};
+// Each status implies a typical accuracy band, read as a 90% range: a rough estimate lands within
+// about ±25%, a contractor or city quote within about ±10% (change orders, allowances), a fixed fee
+// or signed fixed price doesn't move. Treating lines as independent and roughly normal, they combine
+// into a standard deviation for the whole build, which gives P50/P80 costs, how often the current
+// budget covers the build, and the contingency needed to reach P80. Real overruns skew upward, so
+// these are best read as floors.
+const FIRM={e:{label:"Estimate",range:0.25},q:{label:"Quote",range:0.10},k:{label:"Known",range:0}};
 const FIRM_LINES=[["structure","Structure",true],["foundation","Foundation",true],["sitePrep","Grading, demo & access",true],["utilTrench","Utility trenching",true],["electrical","Electrical",true],["hardscape","Hardscape & path",true],
   ["permits","Permits & inspections",false],["hookup","Water & sewer fees",false],["design","Design & engineering",false],["surveys","Surveys & reports",false],["furnishing","Furnishing",false]];
 const FIRM_DEFAULT="e".repeat(FIRM_LINES.length);
-// amounts: {key: dollars before markup}; firm: one letter per FIRM_LINES entry; markup: % applied to every line.
-function budgetConfidence(amounts,firm,markup){
-  const m=1+markup/100;let total=0,firmed=0,varSum=0,hard=0,hardCont=0;
+const Z90=1.6449,Z80=0.8416;
+// Standard normal CDF (Abramowitz & Stegun 7.1.26 via erf).
+function normCdf(z){const t=1/(1+0.3275911*Math.abs(z)/Math.SQRT2),y=1-((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-z*z/2);return z>=0?(1+y)/2:(1-y)/2}
+// amounts: {key: dollars before markup}; firm: one letter per FIRM_LINES entry; markup: % on every line;
+// contingencyAmt: the budget's current contingency in dollars.
+function budgetConfidence(amounts,firm,markup,contingencyAmt){
+  const m=1+markup/100;let base=0,firmed=0,varSum=0,hard=0;
   const lines=FIRM_LINES.map(([k,label,isHard],i)=>{
-    const st=FIRM[firm[i]]?firm[i]:"e",amt=amounts[k]||0,withM=amt*m;
-    total+=withM;if(st!=="e")firmed+=withM;varSum+=Math.pow(withM*FIRM[st].range,2);
-    if(isHard){hard+=amt;hardCont+=amt*FIRM[st].cont}
-    return{k,label,i,st,amt};
+    const st=FIRM[firm[i]]?firm[i]:"e",amt=amounts[k]||0,withM=amt*m,sd=withM*FIRM[st].range/Z90;
+    base+=withM;if(st!=="e")firmed+=withM;varSum+=sd*sd;if(isHard)hard+=amt;
+    return{k,label,i,st,amt,v:sd*sd};
   });
-  return{lines,firmedPct:total>0?firmed/total*100:0,spread:Math.sqrt(varSum),suggested:hard>0?Math.round(hardCont/hard*100):0};
+  const sigma=Math.sqrt(varSum),need80=Z80*sigma;
+  return{
+    lines,sigma,base,firmedPct:base>0?firmed/base*100:0,
+    p50:base,p80:base+need80,
+    // Chance the budget (line items + contingency) covers the build.
+    coverage:sigma>0?normCdf(contingencyAmt/sigma)*100:100,
+    // Rounded up, so applying it always reaches at least P80.
+    suggested:hard>0?Math.ceil(need80/hard*100-1e-9):0,
+    drivers:lines.filter(l=>l.v>0).map(l=>({...l,share:l.v/varSum*100})).sort((a,b)=>b.share-a.share),
+  };
 }
 function BudgetConfidence({on,onToggle,firm,setFirm,bc,contingency,setContingency}){
   const setLine=(i,st)=>setFirm(firm.slice(0,i)+st+firm.slice(i+1));
+  const tile=(k,v,s)=>(<div key={k} style={{...card,background:"#0d1117",padding:"10px 12px"}}>
+    <div style={{fontSize:10.5,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{k}</div>
+    <div style={{fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:600,color:"#e6edf3",marginTop:2}}>{v}</div>
+    <div style={{fontSize:11,color:"#6e7681",lineHeight:1.35}}>{s}</div>
+  </div>);
+  const cov=Math.round(bc.coverage);
   return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
-    <Tog on={on} onToggle={onToggle} label="Track how firm each cost is" sub="Mark each line as an estimate, a quote or a known price to see how solid the budget is and what contingency it needs"/>
+    <Tog on={on} onToggle={onToggle} label="Track how firm each cost is" sub="Mark each line as an estimate, a quote or a known price to see how likely the budget is to hold and what contingency it needs"/>
     {on&&(<div style={nested}>
       <div role="table" aria-label="Budget confidence by line" style={{display:"flex",flexDirection:"column"}}>
         {bc.lines.filter(l=>l.amt>0).map(l=>(
@@ -328,16 +349,26 @@ function BudgetConfidence({on,onToggle,firm,setFirm,bc,contingency,setContingenc
             </span></span>
           </div>))}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginTop:12}}>
-        {[["Quoted or known",Math.round(bc.firmedPct)+"%","of the budget"],["Line-item uncertainty","±"+fD(bc.spread),"likely spread of the total"],["Suggested contingency",bc.suggested+"%","of hard costs · you have "+contingency+"%"]].map(([k,v,s])=>(
-          <div key={k} style={{...card,background:"#0d1117",padding:"10px 12px"}}>
-            <div style={{fontSize:10.5,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{k}</div>
-            <div style={{fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:600,color:"#e6edf3",marginTop:2}}>{v}</div>
-            <div style={{fontSize:11,color:"#6e7681"}}>{s}</div>
-          </div>))}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10,marginTop:12}}>
+        {tile("Quoted or known",Math.round(bc.firmedPct)+"%","of the line-item budget")}
+        {tile("P50 / P80 build cost",fD(bc.p50)+" / "+fD(bc.p80),"50% / 80% chance it costs less")}
+        {tile("Your budget holds",bc.sigma>0?"≈ "+cov+"%":"100%","of the time, with "+contingency+"% contingency")}
+        {tile("Contingency for P80",bc.suggested+"%","of hard costs · you have "+contingency+"%")}
       </div>
       {bc.suggested!==contingency&&<button type="button" onClick={()=>setContingency(bc.suggested)} style={{marginTop:10,padding:"7px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:"transparent",border:"1px solid "+tb,color:tb}}>Use {bc.suggested}% contingency</button>}
-      <div style={{fontSize:11,color:"#6e7681",marginTop:8,lineHeight:1.45}}>Estimates typically land within ±25%, quotes within ±10%, and known prices don't move. The uncertainty combines lines the way estimators do for independent risks (root-sum-square), so it's smaller than adding every worst case.</div>
+
+      {bc.drivers.length>0&&(<div style={{marginTop:14}}>
+        <div style={{fontSize:12,color:"#8b949e",marginBottom:6}}>What drives the uncertainty — firm these up first</div>
+        {bc.drivers.filter(d=>d.share>=1).slice(0,5).map(d=>(
+          <div key={d.k} style={{display:"grid",gridTemplateColumns:"minmax(120px,170px) 1fr 44px",alignItems:"center",gap:10,padding:"3px 0"}}>
+            <span style={{fontSize:12,color:"#c9d1d9"}}>{d.label} <span style={{color:d.st==="e"?yl:tb,fontSize:11}}>({FIRM[d.st].label.toLowerCase()})</span></span>
+            <span style={{height:10,background:"#0d1117",borderRadius:3,position:"relative"}}><span style={{position:"absolute",left:0,top:0,bottom:0,width:Math.max(d.share,1)+"%",background:d.st==="e"?yl:tb,borderRadius:3,opacity:0.8}}/></span>
+            <span style={{fontSize:12,color:"#e6edf3",textAlign:"right"}}>{Math.round(d.share)}%</span>
+          </div>))}
+      </div>)}
+
+      <div style={{fontSize:11,color:"#6e7681",marginTop:10,lineHeight:1.45}}>Each status is read as a 90% range — estimates ±25%, quotes ±10%, known prices fixed — and lines are combined as independent risks. P80 means an 80% chance the build costs less. Real overruns tend to skew upward, so treat these as floors. Build costs exclude any loan fee.</div>
     </div>)}
   </div>);
 }
@@ -1214,7 +1245,7 @@ function App(){
   // Insurance covers rebuilding the dwelling: the structure and its foundation, plus the builder's
   // margin on them. Permits, fees, design, site work and furniture aren't part of dwelling coverage.
   const insBase=Math.round((buildCost+foundation)*(1+markup/100));
-  const bc=budgetConfidence({structure:buildCost,foundation,sitePrep,utilTrench,electrical,hardscape,permits,hookup,design,surveys,furnishing},firm,markup);
+  const bc=budgetConfidence({structure:buildCost,foundation,sitePrep,utilTrench,electrical,hardscape,permits,hookup,design,surveys,furnishing},firm,markup,contingencyAmt);
   const subtotal=buildCost+siteCost+softCostBase+contingencyAmt,markupAmt=Math.round(markupBase*(markup/100));
   const assetCost=subtotal+markupAmt;
   const origFeeAmt=origFeeOn?Math.round(assetCost*(origFee/100)):0;
@@ -1383,7 +1414,7 @@ function App(){
         ["Value multiplier",grm+"× monthly long-term rent"],
       ],
       notes:[
-        ...(firmOn?["Budget confidence: "+Math.round(bc.firmedPct)+"% of line-item costs are quoted or known; the remaining uncertainty is about ±"+fD(bc.spread)+". Contingency is "+contingency+"% of hard costs"+(bc.suggested!==contingency?" (suggested from firmness: "+bc.suggested+"%)":", as suggested from firmness")+"."]:[]),
+        ...(firmOn?["Budget confidence: "+Math.round(bc.firmedPct)+"% of line-item costs are quoted or known. P50 build cost "+fD(bc.p50)+", P80 "+fD(bc.p80)+"; the budget, with "+contingency+"% contingency, covers the build about "+Math.round(bc.coverage)+"% of the time"+(bc.suggested!==contingency?" (P80 needs "+bc.suggested+"%)":"")+"."]:[]),
         ...(facts?(()=>{const lc=t=>t[0].toLowerCase()+t.slice(1);return["Site work is estimated from site facts — foundation: "+lc(sf.why.foundation)+"; grading and access: "+lc(sf.why.sitePrep)+"; utilities: "+lc(sf.why.utilTrench)+"; electrical: "+lc(sf.why.electrical)+"; surveys: "+lc(sf.why.surveys)+"."]})():[]),
         "Rent is the figure entered. The ADU's value is estimated at "+grm+"× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
         "The model runs month by month from project start."+(buildMonths>0?" During the "+buildMonths+"-month build there is no rent; funds are drawn on a standard construction schedule (soft costs up front, owner cash first, hard costs on an S-curve with 5% retention)"+(loanAmt>0?(conIntMode==="none"?". Construction interest is not charged in this scenario.":", with interest on the drawn balance."):"."):""),
