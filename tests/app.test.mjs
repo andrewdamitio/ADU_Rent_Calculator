@@ -165,6 +165,14 @@ describe("cost model", () => {
     const dep = async f => money((await load(`?customRent=2600&furnishing=${f}&conIntMode=none`)).text().match(/depreciation \((\$[\d,]+)\/yr/)[1]);
     assert.equal(await dep(0), await dep(10000));
   });
+  test("the value multiplier sets the ADU's value everywhere", async () => {
+    const c = await load("?customRent=2600&grm=200&view=consumer");
+    assert.equal(c.card("Value when complete"), "$520,000", "200 × $2,600");
+    assert.match(c.text(), /gross rent multiplier \(200× monthly long-term rent\)/);
+    assert.match(c.report().textContent, /Value multiplier200× monthly long-term rent/);
+    const i = await load("?customRent=2600&grm=200");
+    assert.match(i.text(), /Equity\?\+\$520k/);
+  });
   test("insurance is on the building's rebuild cost, not fees or site work", async () => {
     const ins = async qs => money((await load("?customRent=2600" + qs)).text().match(/Insurance \((\$[\d,]+)\/yr\)/)[1]);
     // (600 sq ft × $300 structure + $10,000 foundation) × 1.20 builder margin × 0.5%

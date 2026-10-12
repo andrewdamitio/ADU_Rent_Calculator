@@ -108,7 +108,7 @@ const fYr=v=>v===Infinity?"Never":v>50?"50+ yr":v.toFixed(1)+" yr";
 const fD=n=>{const r=Math.round(n);return(r<0?"−$":"$")+Math.abs(r).toLocaleString()};
 const fK=n=>{const a=Math.abs(n),s=n<0?"-":"+";return a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
 
-const CI={"Rent":"Year-1 monthly rent at the current ADU size, as entered.\n\nIf STR mode is on, revenue is the nightly rate × 30.4 nights (before unbooked nights).","Net":"First-month rent minus operating expenses (pre-tax).\n\nProperty tax, insurance, maintenance, vacancy, management.","Cov.":"First-month pre-tax net rent ÷ loan payment.\n\nIgnores equity, rent growth, and income tax.\n100% = breakeven monthly.","+/−":"First-month pre-tax net rent minus loan payment.\n\nDoes NOT reflect rent growth or taxes.\n\nGreen = passive income.\nRed = monthly subsidy.","CF+":"Years from project start until monthly cash flow turns positive: rent after expenses and income tax, minus the loan payment.\n\n'Now' = positive from the first rent check.\n* = only turned positive because the loan ended.\n\nAccounts for rent growth AND income tax (interest + depreciation deductions shrink over time).","Payback":"Years from project start until the ADU has paid back every dollar you put in: your down payment plus any months where you covered a shortfall.\n\nUses after-tax cash flow after loan payments, so financing costs count. 'Immediate' = $0 down and never out of pocket.\n\nGreen ≤ term. Yellow ≤ 1.5×.\nRed = longer.","Equity":"Rough estimate of value added on day one, using a GRM of 110× monthly rent.\n\nSimplified heuristic — real appraisers use sales comparables first, income approach as a cross-check. The right multiplier varies sharply: coastal CA and Seattle have GRMs of 200–300×, so this likely understates value there. Midwest markets are closer to 80–120×.\n\nAlways uses LTR rent, not STR income.\n\nGreen = gross estimate exceeds ADU cost.","Return":"Your net position when the loan is paid off: the ADU's estimated value at that point, plus cumulative after-tax cash flow, minus your down payment.\n\nThe first % is the compound annual return on TOTAL PROJECT COST from project start to loan payoff (construction included) — the denominator is the full cost whether you financed it or not.\n\nThe second is the same on the cash you actually put in. It is undefined at 0% down, where you invested nothing."};
+const CI={"Rent":"Year-1 monthly rent at the current ADU size, as entered.\n\nIf STR mode is on, revenue is the nightly rate × 30.4 nights (before unbooked nights).","Net":"First-month rent minus operating expenses (pre-tax).\n\nProperty tax, insurance, maintenance, vacancy, management.","Cov.":"First-month pre-tax net rent ÷ loan payment.\n\nIgnores equity, rent growth, and income tax.\n100% = breakeven monthly.","+/−":"First-month pre-tax net rent minus loan payment.\n\nDoes NOT reflect rent growth or taxes.\n\nGreen = passive income.\nRed = monthly subsidy.","CF+":"Years from project start until monthly cash flow turns positive: rent after expenses and income tax, minus the loan payment.\n\n'Now' = positive from the first rent check.\n* = only turned positive because the loan ended.\n\nAccounts for rent growth AND income tax (interest + depreciation deductions shrink over time).","Payback":"Years from project start until the ADU has paid back every dollar you put in: your down payment plus any months where you covered a shortfall.\n\nUses after-tax cash flow after loan payments, so financing costs count. 'Immediate' = $0 down and never out of pocket.\n\nGreen ≤ term. Yellow ≤ 1.5×.\nRed = longer.","Equity":"Rough estimate of value added on day one: the value multiplier (a gross rent multiplier, set under Income & Tax Assumptions) × monthly long-term rent.\n\nSimplified heuristic — real appraisers use sales comparables first, income approach as a cross-check. The right multiplier varies sharply: coastal CA and Seattle have GRMs of 200–300×, so this likely understates value there. Midwest markets are closer to 80–120×.\n\nAlways uses LTR rent, not STR income.\n\nGreen = gross estimate exceeds ADU cost.","Return":"Your net position when the loan is paid off: the ADU's estimated value at that point, plus cumulative after-tax cash flow, minus your down payment.\n\nThe first % is the compound annual return on TOTAL PROJECT COST from project start to loan payoff (construction included) — the denominator is the full cost whether you financed it or not.\n\nThe second is the same on the cash you actually put in. It is undefined at 0% down, where you invested nothing."};
 
 // Site work worked out from facts about the lot instead of raw dollar amounts. Typical
 // 2025–2026 unit costs, set so the default detached scenario matches the earlier dollar defaults:
@@ -176,7 +176,7 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,incomeTax:0,customRent:0,customName:"",view:"internal"};
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,incomeTax:0,customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -190,7 +190,7 @@ function shareUrlFor(state){
 }
 // Valid ranges for numeric fields. Anything loaded from a URL or storage — or typed into a
 // value — is clamped to these. Cost lines go well past their sliders so a real quote always fits.
-const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],incomeTax:[0,50],customRent:[0,100000]};
+const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],incomeTax:[0,50],customRent:[0,100000]};
 const INT_KEYS=new Set(["trenchFt","term","strMonths","buildMonths","horizon"]);
 const ENUMS={projectType:Object.keys(PTYPES),siteMode:["facts","dollars"],fdn:["new","existing","none"],slope:["flat","gentle","moderate","steep"],soil:["known","unknown","clay","rock"],access:["open","side","tight"],demo:["none","small","structure"],panel:["room","full","small"],boundary:["needed","have"],rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
 function cleanField(k,raw){
@@ -461,7 +461,7 @@ const SRC=[
 {t:"California FAIR Plan Rate Filings — CA Dept. of Insurance",u:"https://www.insurance.ca.gov/0250-insurers/0300-insurers/0200-fair-plan/",n:"CA insurer-of-last-resort rates and underwriting rules. Source for the 1.5–2.5% insurance rate noted for high-wildfire-risk areas where standard carriers have withdrawn."},
 ]},
 {cat:"Property Value & Financing",links:[
-{t:"ADU Appraisal: 100–120× Rule — Genuine Kitchen & Bath",u:"https://genuinekitchenbath.com/adu-rental-income-san-mateo-county/",n:"The GRM heuristic widely cited by lenders/builders. The 110× midpoint is what this tool's Equity column uses."},
+{t:"ADU Appraisal: 100–120× Rule — Genuine Kitchen & Bath",u:"https://genuinekitchenbath.com/adu-rental-income-san-mateo-county/",n:"The GRM heuristic widely cited by lenders/builders. The 110× midpoint is this tool's default value multiplier."},
 {t:"6 ADU Loan Options — RenoFi",u:"https://www.renofi.com/adus/adu/financing/",n:"Loan product menu: HELOC, cash-out refi, renovation loans, construction-to-perm. Informs the rate/term defaults."},
 {t:"ADU Financing Options — JVM Lending",u:"https://www.jvmlending.com/blog/how-much-does-an-adu-cost-adu-financing-options/",n:"Typical rate ranges (6–9%) for ADU loans in 2026 — calibrates the 7.5% default."},
 {t:"Best ADU Loan Programs CA — Better Place",u:"https://betterplacedesignbuild.com/blog/adu-loan-programs/",n:"CalHFA grant info and program-specific structures."},
@@ -692,7 +692,7 @@ function YearsCard({title,value,onChange,min,max,presets,unit,aria,note}){
   </div>);
 }
 
-function ConsumerView({cm,rentY1,unitNoun,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -917,7 +917,7 @@ function ConsumerView({cm,rentY1,unitNoun,total,loanPmt,loanAmt,cashDownAmt,rate
         {cm.valueY1>=total?"You create immediate equity: once built, the ADU adds an estimated "+fD(cm.valueY1)+" to your property value — "+fD(cm.valueY1-total)+" more than what you paid.":"The ADU initially appraises "+fD(total-cm.valueY1)+" below its cost — common with high site work or premium finishes."}
         {growth>0?" As rents grow "+growth+"%/yr, that value climbs to an estimated "+fK2(cm.valueEnd)+" by "+(loanAmt>0?"loan payoff":"year "+cm.evalYrs)+".":""}
       </div>
-      <div style={{fontSize:11,color:LT.muted,marginTop:8}}>Value estimates use a gross rent multiplier (110× monthly LTR rent). Actual appraisals use comparable sales and may differ. Coastal markets often see higher multipliers (200–300×), meaning these estimates may be conservative.</div>
+      <div style={{fontSize:11,color:LT.muted,marginTop:8}}>Value estimates use a gross rent multiplier ({grm}× monthly long-term rent). Actual appraisals use comparable sales and may differ.{grm<200?" Coastal markets often see higher multipliers (200–300×), so this may be conservative there.":""}</div>
     </div>
 
     {/* CASH POSITION TIMELINE */}
@@ -1043,7 +1043,7 @@ function ConsumerView({cm,rentY1,unitNoun,total,loanPmt,loanAmt,cashDownAmt,rate
         <div style={{fontSize:11,color:LT.text,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Methodology</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Rent estimates</strong> are whatever you enter as the rent you would charge; the reference range shown beside that field uses 2025–2026 mid-range rents for a 1-bedroom ADU, scaled sub-linearly by unit size (a 2-bedroom rents for less than 2× a 1-bedroom). Custom entries use your own input. Short-term rental income is the nightly rate you set × ~30.4 nights, less unbooked nights and hosting costs.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Construction costs</strong> are built up from line-item components (structure, foundation, site work, permits, fees, design, surveys) at 2026 mid-range defaults, plus a builder/GC margin. Garage conversions, prefab units, and high-cost markets are reflected via slider tick marks. Costs vary substantially by region and site conditions — adjust the sliders to match local builder quotes.</div>
-        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Property value</strong> uses a gross rent multiplier of 110× monthly rent — a heuristic widely cited by lenders and builders. Real appraisals use comparable sales as the primary method, and multipliers can vary substantially by market: low-cost regions trend toward 80–120×, while expensive coastal markets often run 200–300×. The 110× default is conservative for high-rent metros.</div>
+        <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Property value</strong> uses a gross rent multiplier of {grm}× monthly long-term rent — a heuristic widely cited by lenders and builders. Real appraisals use comparable sales as the primary method, and multipliers can vary substantially by market: low-cost regions trend toward 80–120×, while expensive coastal markets often run 200–300×. The default of 110× is conservative for high-rent metros.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Operating expenses</strong> include property tax (with annual escalator), insurance (a rate on the building's replacement cost — structure and foundation, not fees or site work — with annual escalator), vacancy, maintenance reserve, and property management. Escalator defaults reflect recent 2020–2025 trends and vary by jurisdiction.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Income tax</strong> is modeled on US Schedule E: rental income minus loan interest, depreciation (27.5-year straight-line on the ADU cost basis, excluding furnishings), and operating expenses. Paper losses are not credited against other income. Default rate is 0% (not modeled); the Full model's marginal-tax slider applies your combined federal + state rate. Passive activity loss rules and depreciation recapture at sale are not modeled.</div>
         <div style={{marginBottom:8}}><strong style={{color:LT.text}}>Cash flow simulation</strong> runs month by month from project start: the construction period, then rent and loan payments together, with rent growth, expense escalation, and tax effects compounded monthly. Every figure on this page comes from that one simulation. Loan amortization uses the standard mortgage formula. Payback is when your cumulative cash position — down payment plus every month's net cash flow after loan payments and tax — returns to zero. Annual returns are compound rates.</div>
@@ -1093,7 +1093,7 @@ function App(){
   const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,...PTYPES[t].f,projectType:t}))},[]);
   // Switching to dollar amounts starts the sliders at what the site facts produced, so nothing jumps.
   const setSiteMode=useCallback(m=>{fromShareRef.current=false;setState(s=>m==="dollars"&&s.siteMode!=="dollars"?{...s,siteMode:m,...siteDollars(siteFromFacts(s,s.sqft))}:{...s,siteMode:m})},[]);
-  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,incomeTax,customRent,customName,view}=state;
+  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,incomeTax,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const ptype=PTYPES[projectType]||PTYPES.detached;
   // Site work: from the site facts, or the dollar sliders when the user prefers to enter amounts.
@@ -1150,7 +1150,7 @@ function App(){
       const aC=assetCost*costMult,tot=aC+(origFeeOn?Math.round(aC*(origFee/100)):0),down=Math.round(tot*(cashDown/100));
       return runModel({loanAmt:tot-down,cashDown:down,annRate:(rate+rateAdd)/100,termYr:term,leaseUp,buildMo:buildMonths,grossY1:grossY1*rentMult,collectPct:1-vacPct,opPct,
         mPTY1:(aC*(taxRate/100))/12,mInsY1:(insBase*costMult*(insurance/100))/12,rentGrowth:effG,taxGrowthA:taxGrowth/100,insGrowthA:insGrowth/100,taxMarg:incomeTax/100,
-        depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*110,valueGrowth:growth/100,
+        depBasis:Math.max(0,aC-furnBasis*costMult),valueY1:ltrRent*grm,valueGrowth:growth/100,
         conMode:conIntMode,conRate:(rate+rateAdd+conPremium)/100,spendUp:spendUp*costMult,spendEnd:furnBasis*costMult});
     };
     const base=mk();
@@ -1165,7 +1165,7 @@ function App(){
       {label:"Construction 25% over budget",costMult:1.25},
     ].map((sc,i)=>{const r=i===0?base:mk(sc);return{label:sc.label,cfPlus:r.cfPlus,cfAtTerm:r.cfAtTerm,po:r.po,ret:r.at(evalAt).tot}});
     return{base,stress};
-  },[loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,insBase,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,growth]);
+  },[loanAmt,horizon,assetCost,origFeeOn,origFee,cashDown,rate,term,buildMonths,conIntMode,conPremium,spendUp,grossY1,vacPct,opPct,taxRate,insurance,insBase,effG,taxGrowth,insGrowth,incomeTax,furnBasis,ltrRent,grm,growth]);
   const M0=mdl.base;
   // The permanent-loan payment, including any construction interest added to the loan.
   const loanPmt=M0.pmt;
@@ -1179,7 +1179,7 @@ function App(){
   const roiCash=cashDownAmt>0?annualized(ret,cashDownAmt,horizonYrs):null;
 
   // First-month (year-1) snapshot for the Full model's metric cards.
-  const r={rent:grossY1,net:first.noi,sur:first.noi-loanPmt,cov:loanPmt>0?(first.noi/loanPmt)*100:null,cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,eq:ltrRent*110,ret,roi};
+  const r={rent:grossY1,net:first.noi,sur:first.noi-loanPmt,cov:loanPmt>0?(first.noi/loanPmt)*100:null,cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,eq:ltrRent*grm,ret,roi};
   // Share of gross rent that goes to vacancy, opex, property tax and insurance — for the user's rent.
   const expPct=grossY1>0?Math.round(((grossY1-first.noi)/grossY1)*100):0;
   // Break-even gross rent: year 1, pre-tax.
@@ -1207,12 +1207,12 @@ function App(){
       pts,bars,annual,isCash,evalYrs,postLoan:M0.year(isCash?evalYrs:term+1),loanEndYr:M0.loanEnd/12,
       hero:[10,15,20].map(Y=>{const s=M0.at(Y*12);return{yrs:Y,ret:s.tot,roi:annualized(s.tot,total,Y)}}),
       cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,
-      valueY1:ltrRent*110,valueEnd:end.value,subsidies:M0.subsidies,
+      valueY1:ltrRent*grm,valueEnd:end.value,subsidies:M0.subsidies,
       // Operating cash flow only — construction interest paid out of pocket is shown on its own line.
       cashCollected:end.cash+cashDownAmt+M0.conPaid,conPaid:M0.conPaid,conCap:M0.conCap,
       ret,roi,roiCash,stress:mdl.stress,
     };
-  },[mdl,term,total,cashDownAmt,ltrRent,evalK,evalYrs,isCash,buildMonths]);
+  },[mdl,term,total,cashDownAmt,ltrRent,grm,evalK,evalYrs,isCash,buildMonths]);
 
   const handleReset=()=>{fromShareRef.current=false;setState(DEF);store.del(SK)};
   const onResetClick=()=>{
@@ -1269,11 +1269,11 @@ function App(){
         ["Property tax",pct(taxRate)+"% of cost · +"+pct(taxGrowth)+"%/yr"],
         ["Insurance",pct(insurance)+"% of "+fD(insBase)+" rebuild cost · +"+pct(insGrowth)+"%/yr"],
         ["Income tax",incomeTax>0?incomeTax+"% marginal rate":"Not modeled"],
-        ["Value multiplier","110× monthly long-term rent"],
+        ["Value multiplier",grm+"× monthly long-term rent"],
       ],
       notes:[
         ...(facts?(()=>{const lc=t=>t[0].toLowerCase()+t.slice(1);return["Site work is estimated from site facts — foundation: "+lc(sf.why.foundation)+"; grading and access: "+lc(sf.why.sitePrep)+"; utilities: "+lc(sf.why.utilTrench)+"; electrical: "+lc(sf.why.electrical)+"; surveys: "+lc(sf.why.surveys)+"."]})():[]),
-        "Rent is the figure entered. The ADU's value is estimated at 110× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
+        "Rent is the figure entered. The ADU's value is estimated at "+grm+"× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
         "The model runs month by month from project start."+(buildMonths>0?" During the "+buildMonths+"-month build there is no rent; funds are drawn on a standard construction schedule (soft costs up front, owner cash first, hard costs on an S-curve with 5% retention)"+(loanAmt>0?(conIntMode==="none"?". Construction interest is not charged in this scenario.":", with interest on the drawn balance."):"."):""),
         "Operating costs are vacancy, maintenance, management"+(hasSTR?", hosting":"")+", property tax and insurance, each escalating at the rates shown.",
         incomeTax>0?"Income tax is applied at "+incomeTax+"% to rental income after "+(loanAmt>0?"loan interest and ":"")+"27.5-year depreciation of "+fD(depBasis)+" (furnishings excluded; construction interest capitalized). Passive-loss limits and depreciation recapture are not modeled.":"Income tax is not modeled; figures are pre-tax.",
@@ -1389,6 +1389,7 @@ function App(){
         {/* INCOME & TAX */}
         <Section title="Income & Tax Assumptions" open={openSec.tax} onToggle={()=>toggleSec("tax")} summary={<span style={{fontSize:12,color:"#8b949e"}}>{growth===0?"Flat":"+"+growth+"%/yr"} rent · {incomeTax===0?"tax not modeled":incomeTax+"% tax"}</span>}>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <TS label={<>Value multiplier<IT align="left" text={"Estimates what the ADU adds to your property's value: this multiple × the monthly long-term rent (a gross rent multiplier, or GRM).\n\nAppraisers rely mainly on comparable sales and use the GRM as a cross-check. Low-cost markets run about 80–120×; expensive coastal markets 200–300×.\n\nValue drives Equity, Return and the net-equity chart, so set this for your market."}/></>} value={grm} onChange={set("grm")} typeMin={LIM.grm[0]} typeMax={LIM.grm[1]} min={50} max={400} step={5} format={v=>v+"× rent"} ticks={[{value:80,label:"Low-cost",color:tk},{value:110,label:"Typical",color:tb},{value:200,label:"Coastal",color:tk},{value:300,label:"Prime coastal",color:yl}]}/>
             <TS label="Annual rent growth" value={growth} onChange={set("growth")} typeMin={LIM.growth[0]} typeMax={LIM.growth[1]} min={0} max={6} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:rd},{value:2,label:"Low",color:tk},{value:3,label:"Avg",color:tb},{value:5,label:"Hot",color:gn}]}/>
             <TS label="Property tax growth" value={taxGrowth} onChange={set("taxGrowth")} typeMin={LIM.taxGrowth[0]} typeMax={LIM.taxGrowth[1]} min={0} max={6} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:gn},{value:2,label:"CA Prop 13 cap",color:tb},{value:3,label:"Avg reassess",color:tk},{value:5,label:"Hot market",color:yl}]}/>
             <TS label="Insurance growth" value={insGrowth} onChange={set("insGrowth")} typeMin={LIM.insGrowth[0]} typeMax={LIM.insGrowth[1]} min={0} max={15} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:gn},{value:3,label:"Inflation",color:tk},{value:6,label:"Natl recent",color:tb},{value:10,label:"CA / FL",color:yl},{value:14,label:"Crisis",color:rd}]}/>
@@ -1515,7 +1516,7 @@ function App(){
           <strong style={{color:"#e6edf3"}}>Reading the results: </strong>
           <strong style={{color:tb}}>Cov.</strong> and <strong style={{color:tb}}>+/−</strong> are year-1 pre-tax cash flow.
           <strong style={{color:tb}}> CF+</strong>, <strong style={{color:yl}}>Payback</strong>, and <strong style={{color:gn}}>Return</strong> all account for rent growth{incomeTax>0?" and income tax at "+incomeTax+"%":""}.
-          <strong style={{color:gn}}> Equity</strong> = rough value-added estimate (110× LTR rent via GRM — a heuristic; actual appraisals use comparable sales, and coastal-market GRMs run 200–300×).
+          <strong style={{color:gn}}> Equity</strong> = rough value-added estimate ({grm}× LTR rent via GRM — a heuristic; actual appraisals use comparable sales, and coastal-market GRMs run 200–300×).
           Builder markup of {markup}% ({fD(markupAmt)}) included. Structure $/sqft covers the unit shell, finishes, MEP, and built-in appliances — foundation, panel upgrades, site work, and furnishing are separate (no double-counting).
           <strong style={{color:"#e6edf3"}}> Not included:</strong> solar panels (mandatory in CA, $5–10K), landscaping restoration, or HOA fees.
           <span style={{color:tb}}> Settings saved automatically.</span>
@@ -1557,7 +1558,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} rentY1={grossY1} unitNoun={ptype.noun} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} rentY1={grossY1} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>
