@@ -1,0 +1,15 @@
+{
+  "name": "adu-rent-calculator",
+  "private": true,
+  "description": "Single-file ADU rent calculator. App.source.jsx is bundled into the <script> tag of index.html.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
