@@ -218,6 +218,22 @@ describe("consumer summary", () => {
   });
 });
 
+describe("Full model layout", () => {
+  test("inputs on the left, rent field and results on the right, reference below", async () => {
+    const { doc } = await load("?customRent=2600");
+    const grid = doc.querySelector(".int-grid");
+    assert.ok(grid.querySelector(".int-inputs").textContent.includes("Project Costs"));
+    const results = grid.querySelector(".int-results");
+    assert.ok(results.querySelector("#rentAmt"));
+    assert.match(results.textContent, /Break-even rent.*Payback/);
+    assert.ok(!grid.textContent.includes("Reading the results"), "legend sits below the grid");
+  });
+  test("narrow-screen bar shows rent vs. break-even and payback", async () => {
+    const { doc } = await load("?customRent=2600");
+    assert.match(doc.querySelector(".mini-bar").textContent, /Total.*Payment.*vs\. break-even.*Payback/);
+  });
+});
+
 describe("printout", () => {
   test("inputs are screen-only; a static scenario card and date are print-only", async () => {
     const { doc } = await load("?customRent=2600&cashDown=20&view=consumer");

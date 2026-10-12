@@ -912,7 +912,7 @@ function App(){
 
   return(
     <div style={{fontFamily:"'DM Sans',sans-serif",background:view==="consumer"?"#f8fafc":"#0d1117",color:view==="consumer"?"#0f172a":"#e6edf3",minHeight:"100vh",padding:"28px 16px",transition:"background 0.2s"}}>
-      <div style={{maxWidth:960,margin:"0 auto"}}>
+      <div style={{maxWidth:view==="internal"?1240:960,margin:"0 auto"}}>
         {/* VIEW SWITCHER — always visible; the primary choice on this page */}
         <div className="no-print" role="tablist" aria-label="View mode" style={{display:"flex",gap:6,marginBottom:22,padding:5,borderRadius:14,border:"1px solid "+(dark?"#30363d":"#cbd5e1"),background:dark?"#0d1117":"#eef2f7"}}>
           <button type="button" role="tab" aria-selected={view==="internal"} onClick={()=>set("view")("internal")} style={{flex:1,padding:"12px 8px",borderRadius:10,cursor:"pointer",userSelect:"none",border:"none",fontFamily:"inherit",transition:"background 0.15s",background:view==="internal"?tb:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
@@ -928,12 +928,16 @@ function App(){
       {view==="internal"&&(<>
         <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><div style={{display:"flex",gap:8,flexShrink:0,marginTop:4}}><button onClick={copyShare} style={{background:copied?"rgba(63,185,80,0.15)":tb,border:"1px solid "+(copied?gn:tb),borderRadius:8,color:copied?gn:"#0d1117",fontSize:13,fontWeight:600,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap",transition:"background 0.15s"}} onMouseEnter={e=>{if(!copied)e.target.style.background="#79b8ff"}} onMouseLeave={e=>{if(!copied)e.target.style.background=tb}}>{copied?"Model link copied ✓":"Copy model link"}</button><button onClick={onResetClick} style={{background:confirmReset?"rgba(248,81,73,0.15)":"transparent",border:"1px solid "+(confirmReset?rd:"#30363d"),borderRadius:6,color:confirmReset?rd:"#8b949e",fontWeight:confirmReset?600:400,fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{if(!confirmReset){e.target.style.borderColor=tb;e.target.style.color=tb}}} onMouseLeave={e=>{if(!confirmReset){e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}}>{confirmReset?"Click again to confirm":"Reset all"}</button></div></div>
 
-        {/* STICKY MINI SUMMARY — stays visible while scrolling through the sliders below */}
-        <div className="no-print" style={{position:"sticky",top:0,zIndex:45,background:"#0d1117",border:"1px solid #21262d",borderRadius:8,padding:"10px 16px",marginBottom:16,display:"flex",gap:20,flexWrap:"wrap",alignItems:"baseline",boxShadow:"0 6px 16px rgba(0,0,0,0.35)"}}>
+        {/* STICKY MINI SUMMARY — narrow screens only; wide screens have the sticky results column */}
+        <div className="no-print mini-bar" style={{position:"sticky",top:0,zIndex:45,background:"#0d1117",border:"1px solid #21262d",borderRadius:8,padding:"10px 16px",marginBottom:16,display:"flex",gap:20,flexWrap:"wrap",alignItems:"baseline",boxShadow:"0 6px 16px rgba(0,0,0,0.35)"}}>
           <div style={{display:"flex",alignItems:"baseline",gap:6}}><span style={{fontSize:10.5,color:"#6e7681",textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</span><span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:700,color:tb}}>{fD(total)}</span></div>
           <div style={{display:"flex",alignItems:"baseline",gap:6}}><span style={{fontSize:10.5,color:"#6e7681",textTransform:"uppercase",letterSpacing:"0.06em"}}>Payment</span><span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:700,color:"#e6edf3"}}>{loanAmt>0?fD(loanPmt)+"/mo":"$0"}</span></div>
+          {(hasCustom||isSTR)&&<div style={{display:"flex",alignItems:"baseline",gap:6}}><span style={{fontSize:10.5,color:"#6e7681",textTransform:"uppercase",letterSpacing:"0.06em"}}>vs. break-even</span><span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:700,color:r.rent>=beRent?gn:rd}}>{(r.rent>=beRent?"+":"")+fD(r.rent-beRent)}</span></div>}
+          {(hasCustom||isSTR)&&<div style={{display:"flex",alignItems:"baseline",gap:6}}><span style={{fontSize:10.5,color:"#6e7681",textTransform:"uppercase",letterSpacing:"0.06em"}}>Payback</span><span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:700,color:r.po<=term?gn:r.po<=term*1.5?yl:rd}}>{r.po===0?"Immediate":fYr(r.po)}</span></div>}
         </div>
 
+        <div className="int-grid">
+        <div className="int-inputs">
         {/* COSTS */}
         <Section title="Project Costs" open={openSec.costs} onToggle={()=>toggleSec("costs")} summary={<><span style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em"}}>Total est.</span><span style={{fontSize:openSec.costs?24:16,fontFamily:"'Fraunces',serif",fontWeight:700,color:tb,marginLeft:8}}>{fD(total)}</span></>}>
           <SL>Unit structure</SL>
@@ -1043,7 +1047,9 @@ function App(){
           <span>{loanAmt>0?"Total repaid: ":"Cash invested: "}<strong style={{color:"#e6edf3"}}>{loanAmt>0?fD(loanPmt*term*12):fD(total)}</strong>{cashDown>0&&loanAmt>0&&<span> + {fD(cashDownAmt)} cash</span>}</span>
           {M0.conInterest>0&&<span>Construction interest: <strong style={{color:"#e6edf3"}}>{fD(M0.conInterest)}</strong> {conIntMode==="paid"?"(paid during build)":"(in the loan)"}</span>}
         </div>
+        </div>
 
+        <div className="int-results">
         {/* RENT YOU'D CHARGE */}
         <div style={{...card,padding:"16px 18px",marginBottom:12,opacity:isSTR?0.45:1,pointerEvents:isSTR?"none":"auto"}}>
           <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:2}}>
@@ -1118,7 +1124,11 @@ function App(){
           ))}
         </div>
         {r.cfAtTerm&&<div style={{fontSize:10.5,color:yl,marginBottom:12,lineHeight:1.5}}>* Cash flow only turns positive once the {term}-year loan is paid off — rent growth alone never overtakes the payment.</div>}
+        </>);})():(<div style={{...card,padding:"32px 24px",textAlign:"center"}}><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.6}}>Enter the monthly rent you'd charge above to see the results for this site. Break-even for the project as configured is <strong style={{color:"#e6edf3"}}>{fD(Math.round(beRent))}/mo</strong>.</p></div>)}
+        </div>
+        </div>
 
+        {(hasCustom||isSTR)&&(<>
         {/* LEGEND */}
         <div style={{marginTop:16,padding:"14px 18px",...card,fontSize:11,lineHeight:1.7,color:"#8b949e"}}>
           <strong style={{color:"#e6edf3"}}>Reading the results: </strong>
@@ -1163,7 +1173,7 @@ function App(){
             </div>
           </div>)}
         </div>
-        </>);})():(<div style={{...card,marginTop:8,padding:"32px 24px",textAlign:"center"}}><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.6}}>Enter the monthly rent you'd charge above to see the results for this site. Break-even for the project as configured is <strong style={{color:"#e6edf3"}}>{fD(Math.round(beRent))}/mo</strong>.</p></div>)}
+        </>)}
       </>)}
 
       {view==="consumer"&&cm&&(<ConsumerView cm={cm} rentY1={grossY1} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
