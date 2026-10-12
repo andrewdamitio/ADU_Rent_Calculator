@@ -298,6 +298,8 @@ function MethodSwitch({label,value,onChange,options}){
   </div>);
 }
 // The controls governed by a MethodSwitch: indented under a rule in the accent colour.
+const pdLabel={display:"flex",flexDirection:"column",gap:4,fontSize:10.5,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500};
+const pdInput={background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none",boxSizing:"border-box",width:"100%"};
 const nested={marginTop:10,paddingLeft:14,borderLeft:"2px solid rgba(88,166,255,0.35)"};
 
 // Budget confidence (optional): mark each cost line as an estimate, a quote, or a known price.
@@ -1346,8 +1348,8 @@ function App(){
     try{const raw=store.get(SK);if(raw)return{state:{...DEF,...cleanState(JSON.parse(raw)),view:"internal"},shared:false}}catch(e){}
     return{state:DEF,shared:false};
   });
-  const[state,setState]=useState(init.state);const[showSources,setShowSources]=useState(false);const[showHow,setShowHow]=useState(false);const[copied,setCopied]=useState(false);const[confirmReset,setConfirmReset]=useState(false);
-  const[openSec,setOpenSec]=useState({costs:true,financing:true,revenue:true,taxes:true,value:true,details:false});
+  const[state,setState]=useState(init.state);const[showSources,setShowSources]=useState(false);const[showHow,setShowHow]=useState(false);const[showNotes,setShowNotes]=useState(false);const[copied,setCopied]=useState(false);const[confirmReset,setConfirmReset]=useState(false);
+  const[openSec,setOpenSec]=useState({costs:true,financing:true,revenue:true,taxes:true,value:true});
   const toggleSec=k=>setOpenSec(s=>({...s,[k]:!s[k]}));
   const resetTimerRef=useRef(null);
   // True while viewing a shared link that the visitor hasn't edited. Saving is held
@@ -1627,6 +1629,26 @@ function App(){
           {(hasCustom||isSTR)&&<div style={{display:"flex",alignItems:"baseline",gap:6}}><span style={{fontSize:10.5,color:"#6e7681",textTransform:"uppercase",letterSpacing:"0.06em"}}>Payback</span><span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:700,color:r.po<=term?gn:r.po<=term*1.5?yl:rd}}>{r.po===0?"Immediate":fYr(r.po)}</span></div>}
         </div>
 
+        {/* PROJECT DETAILS — what this is and who it's for; shown on the Summary and the printed report */}
+        <div style={{...card,padding:"14px 18px",marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:12,flexWrap:"wrap",marginBottom:10}}>
+            <span style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Project details</span>
+            <span style={{fontSize:11,color:"#6e7681"}}>Optional · shown on the Summary and printed report, and included in model links</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,180px),1fr))",gap:10}}>
+            <label htmlFor="rentLoc" style={pdLabel}>Project label<input id="rentLoc" className="fld" type="text" value={customName} onChange={e=>set("customName")(e.target.value)} placeholder="e.g. Smith backyard ADU" style={pdInput}/></label>
+            <label htmlFor="clientName" style={pdLabel}>Prepared for<input id="clientName" className="fld" type="text" value={clientName} onChange={e=>set("clientName")(e.target.value)} placeholder="Client name" style={pdInput}/></label>
+            <label htmlFor="clientAddr" style={pdLabel}>Property address<input id="clientAddr" className="fld" type="text" value={clientAddr} onChange={e=>set("clientAddr")(e.target.value)} placeholder="Street, city" style={pdInput}/></label>
+            <label htmlFor="prepName" style={pdLabel}>Prepared by<input id="prepName" className="fld" type="text" value={prepName} onChange={e=>set("prepName")(e.target.value)} placeholder="Your name" style={pdInput}/></label>
+            <label htmlFor="prepCompany" style={pdLabel}>Company<input id="prepCompany" className="fld" type="text" value={prepCompany} onChange={e=>set("prepCompany")(e.target.value)} placeholder="Company" style={pdInput}/></label>
+          </div>
+          {showNotes||reportNotes.trim()?(
+            <label htmlFor="reportNotes" style={{...pdLabel,marginTop:10}}>Notes for the client<textarea id="reportNotes" className="fld" rows={3} value={reportNotes} onChange={e=>set("reportNotes")(e.target.value.slice(0,1200))} placeholder="Site-specific caveats, what's included or excluded, next steps…" style={{...pdInput,lineHeight:1.5,resize:"vertical"}}/></label>
+          ):(
+            <button type="button" onClick={()=>setShowNotes(true)} style={{marginTop:8,background:"none",border:"none",padding:0,color:tb,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>+ Add notes for the client</button>
+          )}
+        </div>
+
         <div className="int-grid">
         <div className="int-inputs">
         {/* 1. CONSTRUCTION COST */}
@@ -1777,18 +1799,6 @@ function App(){
             </div>}
           </div>
         </Section>
-
-        {/* 6. REPORT DETAILS — who it's for and who prepared it, for the printed report */}
-        <Section title="Report details" open={openSec.details} onToggle={()=>toggleSec("details")} summary={<span style={{fontSize:12,color:"#8b949e"}}>{clientName.trim()?"For "+clientName.trim():"Not filled in"}</span>}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,240px),1fr))",gap:12}}>
-            <label htmlFor="clientName" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Prepared for<input id="clientName" className="fld" type="text" value={clientName} onChange={e=>set("clientName")(e.target.value)} placeholder="Client name" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
-            <label htmlFor="clientAddr" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Property address<input id="clientAddr" className="fld" type="text" value={clientAddr} onChange={e=>set("clientAddr")(e.target.value)} placeholder="Street, city" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
-            <label htmlFor="prepName" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Prepared by<input id="prepName" className="fld" type="text" value={prepName} onChange={e=>set("prepName")(e.target.value)} placeholder="Your name" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
-            <label htmlFor="prepCompany" style={{display:"flex",flexDirection:"column",gap:4,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Company<input id="prepCompany" className="fld" type="text" value={prepCompany} onChange={e=>set("prepCompany")(e.target.value)} placeholder="Company (optional)" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,outline:"none"}}/></label>
-          </div>
-          <label htmlFor="reportNotes" style={{display:"flex",flexDirection:"column",gap:4,marginTop:12,fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Notes for the client<textarea id="reportNotes" className="fld" rows={4} value={reportNotes} onChange={e=>set("reportNotes")(e.target.value.slice(0,1200))} placeholder="Site-specific caveats, what's included or excluded, next steps…" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"8px 10px",color:"#e6edf3",fontSize:13,fontFamily:"inherit",textTransform:"none",letterSpacing:0,lineHeight:1.5,resize:"vertical",outline:"none"}}/></label>
-          <div style={{fontSize:11,color:"#6e7681",marginTop:8,lineHeight:1.45}}>Shown on the printed report and the Summary. These details are saved in this browser and included in model links — leave them out of links you post publicly.</div>
-        </Section>
         </div>
 
         <div className="int-results">
@@ -1810,10 +1820,6 @@ function App(){
                 <input id="rentAmt" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>set("customRent")(parseInt(e.target.value)||0)} placeholder="e.g. 2000" style={{background:"#0d1117",border:"1px solid "+(hasCustom?"#30363d":yl+"80"),borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:15,fontFamily:"'Fraunces',serif",width:120,outline:"none"}}/>
                 <span style={{fontSize:11,color:"#8b949e"}}>/mo</span>
               </div>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>
-              <label htmlFor="rentLoc" style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Label <span style={{textTransform:"none",letterSpacing:0,color:"#6e7681"}}>(optional)</span></label>
-              <input id="rentLoc" className="fld" type="text" value={customName} onChange={e=>set("customName")(e.target.value)} placeholder="e.g. Portland — Alberta" style={{background:"#0d1117",border:"1px solid #30363d",borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:13,fontFamily:"'DM Sans',sans-serif",width:210,outline:"none"}}/>
             </div>
             <button type="button" onClick={()=>set("view")("consumer")} disabled={!hasCustom} style={{padding:"14px 26px",borderRadius:8,fontSize:15,fontWeight:600,letterSpacing:"0.01em",cursor:hasCustom?"pointer":"not-allowed",border:"1px solid "+(hasCustom?tb:"#30363d"),background:hasCustom?tb:"transparent",color:hasCustom?"#0d1117":"#6e7681",fontFamily:"inherit",transition:"background 0.15s, box-shadow 0.15s",boxShadow:hasCustom?"0 1px 10px rgba(88,166,255,0.28)":"none",whiteSpace:"nowrap",flexShrink:0}} onMouseEnter={e=>{if(hasCustom)e.currentTarget.style.background="#79b8ff"}} onMouseLeave={e=>{if(hasCustom)e.currentTarget.style.background=tb}}>Open summary →</button>
           </div>

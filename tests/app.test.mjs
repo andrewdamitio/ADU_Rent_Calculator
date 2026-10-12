@@ -247,6 +247,15 @@ describe("construction-period interest", () => {
 });
 
 describe("report details", () => {
+  test("sit in a Project details card at the top of the Full model, before the cost sections", async () => {
+    const p = await load("?customRent=2600");
+    const t = p.text();
+    assert.match(t, /Copy model link.*Project details.*Project label.*Prepared for.*Property address.*Prepared by.*Company.*\+ Add notes for the client.*Construction cost/);
+    assert.ok(p.doc.querySelector("#reportNotes") === null, "notes stay tucked away until asked for");
+    await p.click("+ Add notes for the client");
+    assert.ok(p.doc.querySelector("#reportNotes"));
+    assert.ok(p.doc.querySelector(".int-results #rentLoc") === null, "the label left the rent card");
+  });
   const qs = "?customRent=2600&clientName=Jane%20Smith&clientAddr=12%20Elm%20St%2C%20Austin&prepName=Sam%20Lee&prepCompany=Lee%20Builders&reportNotes=Excludes%20landscaping.%0ABids%20pending%20for%20the%20foundation.";
   test("appear on the printed report's header and notes", async () => {
     const t = (await load(qs)).report().textContent;
@@ -256,7 +265,9 @@ describe("report details", () => {
   });
   test("show on the Summary and in the Full model section header", async () => {
     assert.match((await load(qs + "&view=consumer")).text(), /Prepared for Jane Smith · 12 Elm St, Austin · Prepared by Sam Lee, Lee Builders/);
-    assert.match((await load(qs)).text(), /Report detailsFor Jane Smith/);
+    const f = await load(qs);
+    assert.equal(f.doc.querySelector("#clientName").value, "Jane Smith");
+    assert.ok(f.doc.querySelector("#reportNotes"), "notes open automatically when there are notes");
   });
   test("leave no trace when empty, and long notes are capped", async () => {
     const empty = await load("?customRent=2600&view=consumer");
@@ -420,7 +431,7 @@ describe("Full model layout", () => {
   test("sections follow build → finance → revenue → taxes & insurance → value", async () => {
     const { doc } = await load("?customRent=2600");
     const sections = [...doc.querySelectorAll(".int-inputs [role=button][aria-expanded]")].map(b => b.firstElementChild.textContent);
-    assert.deepEqual(sections, ["Construction cost", "Financing", "Revenue", "Taxes & insurance", "Value & selling", "Report details"]);
+    assert.deepEqual(sections, ["Construction cost", "Financing", "Revenue", "Taxes & insurance", "Value & selling"]);
     const sectionText = name => [...doc.querySelectorAll(".int-inputs [role=button][aria-expanded]")].find(b => b.firstElementChild.textContent === name).parentElement.textContent;
     assert.match(sectionText("Construction cost"), /Build timeConstruction period/);
     assert.match(sectionText("Revenue"), /Annual rent growth.*Vacancy allowance.*Property management.*Maintenance reserve/);
