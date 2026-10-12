@@ -671,28 +671,17 @@ function PrintReport({rep}){
   </div>);
 }
 
-// Consumer-view card with a years slider and quick presets (loan term, or evaluation horizon when all-cash).
-function YearsCard({title,value,onChange,min,max,presets,unit,aria,note}){
-  return(<div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,gap:8}}>
-      <span style={{fontSize:12,color:LT.body}}>{title}</span>
-      <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text,whiteSpace:"nowrap"}}>{value}{unit}</span>
-    </div>
-    <input type="range" aria-label={aria} min={min} max={max} step={1} value={value} onChange={e=>onChange(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:0}}/>
-    <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
-      <span style={{fontSize:11,color:LT.muted}}>{min} years</span>
-      <span style={{fontSize:11,color:LT.muted}}>{max} years</span>
-    </div>
-    <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}} className="no-print">
-      {presets.map(v=>(
-        <button key={v} type="button" onClick={()=>onChange(v)} style={{padding:"5px 12px",borderRadius:6,fontSize:11,fontWeight:value===v?600:500,cursor:"pointer",userSelect:"none",border:"1px solid "+(value===v?LT.info:LT.border),background:value===v?LT.info:LT.card,color:value===v?LT.card:LT.body,transition:"all 0.15s",fontFamily:"inherit"}}>{v} yr</button>
-      ))}
-    </div>
-    <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5}}>{note}</div>
+// Quick-pick buttons under a Summary slider.
+function Presets({value,onPick,options}){
+  return(<div className="no-print" style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+    {options.map(([v,l])=>(<button key={v} type="button" onClick={()=>onPick(v)} style={{padding:"4px 10px",borderRadius:6,fontSize:11,fontWeight:value===v?600:500,cursor:"pointer",userSelect:"none",border:"1px solid "+(value===v?LT.info:LT.border),background:value===v?LT.info:LT.card,color:value===v?LT.card:LT.body,transition:"all 0.15s",fontFamily:"inherit"}}>{l}</button>))}
   </div>);
 }
+const fieldLabel={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,marginBottom:5};
+const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color:LT.text,whiteSpace:"nowrap"};
+const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
-function ConsumerView({cm,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
+function ConsumerView({cm,verdict,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
   const[barYear,setBarYear]=useState(1);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
@@ -700,81 +689,78 @@ function ConsumerView({cm,rentY1,unitNoun,grm,total,loanPmt,loanAmt,cashDownAmt,
   return(<>
     <PageHeader title="Your ADU Investment Summary" copied={copied} onCopy={copyShare}
       subtitle={sqft+" sq ft "+utype.toLowerCase()+" "+unitNoun+" · "+fD(total)+" project · "+(loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash")}/>
-        <div>
-    {/* RENT YOU'D CHARGE — same state as the Full model */}
-    <div style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+(isSTR?"#94a3b8":LT.info),opacity:isSTR?0.5:1,pointerEvents:isSTR?"none":"auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,gap:12,flexWrap:"wrap"}}>
-        <h3 style={{margin:0,fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,fontFamily:"inherit"}}>What would you charge for rent?</h3>
-        {isSTR&&<span style={{fontSize:11,color:LT.warn}}>Not applicable in STR mode — rent is driven by your nightly rate</span>}
+    {/* THE SHORT ANSWER — the verdict first, before any inputs */}
+    {verdict&&(
+      <div style={{...ltCard,padding:"20px 24px",marginBottom:16,borderLeft:"4px solid "+(cm.ret>=0?LT.pos:LT.neg)}}>
+        <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:8}}>The short answer</div>
+        <p style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:500,lineHeight:1.45,color:LT.text}}>{verdict}</p>
       </div>
-      {!isSTR&&(<>
-      <p style={{margin:"0 0 14px",fontSize:12,color:LT.muted,lineHeight:1.55,maxWidth:620}}>
-        The monthly rent you expect to collect for this {sqft} sq ft {utype.toLowerCase()}, used exactly as typed. Check Zillow, Apartments.com, or local listings for a comparable unit — rents vary widely even within one city. For scale, this size runs about {fD(sizeAnchor)}/mo at the U.S. average, and roughly {fD(rentLo)}–{fD(rentHi)}/mo across major metros.
-      </p>
-      <div style={{display:"flex",gap:16,flexWrap:"wrap",alignItems:"flex-end"}}>
-        <div style={{flex:"0 1 200px",minWidth:170}}>
-          <label htmlFor="cRent" style={{display:"block",fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,marginBottom:5}}>Monthly rent</label>
-          <div style={{position:"relative"}}>
-            <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,color:LT.muted,pointerEvents:"none",fontFamily:"'Fraunces',serif"}}>$</span>
-            <input id="cRent" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>setCustomRent(parseInt(e.target.value)||0)} placeholder="e.g. 2000" style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"9px 44px 9px 26px",color:LT.text,fontSize:16,fontFamily:"'Fraunces',serif",outline:"none",boxSizing:"border-box"}}/>
-            <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:12,color:LT.muted,pointerEvents:"none"}}>/mo</span>
+    )}
+
+    {/* YOUR SCENARIO — the few inputs a homeowner adjusts, in one card */}
+    <div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
+      <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:14}}>Your scenario</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:"20px 28px"}}>
+        {/* Rent */}
+        <div>
+          {isSTR?(<>
+            <div style={fieldLabel}>Monthly revenue</div>
+            <div style={fieldValue}>{fD(rentY1)}/mo</div>
+            <div style={fieldNote}>Short-term rental — set by the nightly rate in the Full model.</div>
+          </>):(<>
+            <label htmlFor="cRent" style={{...fieldLabel,display:"block"}}>Monthly rent{!hasCustom&&<span style={{color:LT.warn,textTransform:"none",letterSpacing:0,fontWeight:500}}> — required</span>}</label>
+            <div style={{position:"relative",maxWidth:220}}>
+              <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,color:LT.muted,pointerEvents:"none",fontFamily:"'Fraunces',serif"}}>$</span>
+              <input id="cRent" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>setCustomRent(parseInt(e.target.value)||0)} placeholder="e.g. 2000" style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"8px 44px 8px 26px",color:LT.text,fontSize:16,fontFamily:"'Fraunces',serif",outline:"none",boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:12,color:LT.muted,pointerEvents:"none"}}>/mo</span>
+            </div>
+            <div style={fieldNote}>What you'd list this {sqft} sq ft {utype.toLowerCase()} for. Check local listings — this size runs about {fD(sizeAnchor)}/mo at the U.S. average and {fD(rentLo)}–{fD(rentHi)}/mo across major metros.</div>
+            <label htmlFor="cLoc" style={{...fieldLabel,display:"block",marginTop:10}}>Label <span style={{textTransform:"none",letterSpacing:0,fontWeight:400}}>(optional)</span></label>
+            <input id="cLoc" className="fld" type="text" value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="e.g. Portland — Alberta" style={{width:"100%",maxWidth:260,background:LT.card,border:"1px solid "+LT.border,borderRadius:6,padding:"7px 10px",color:LT.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
+          </>)}
+        </div>
+
+        {/* Down payment */}
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+            <span style={fieldLabel}>Down payment</span>
+            <span style={fieldValue}>{cashDown===0?"$0":cashDown===100?"All cash":fD(cashDownAmt)+" ("+cashDown+"%)"}</span>
+          </div>
+          <input type="range" aria-label="Down payment percent" min={0} max={100} step={5} value={cashDown} onChange={e=>setCashDown(parseFloat(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"6px 0 0"}}/>
+          <Presets value={cashDown} onPick={setCashDown} options={[[0,"$0"],[20,"20%"],[50,"50%"],[100,"All cash"]]}/>
+          <div style={fieldNote}>
+            {cashDown===100?"No loan — you own it outright from day one.":(cashDown===0?"100% financed":fD(loanAmt)+" financed")+" · "+fD(loanPmt)+"/mo payment."}
+            {cm.conPaid>0?" Plus about "+fD(cm.conPaid)+" of interest during the "+buildMonths+"-month build.":cm.conCap>0?" Includes about "+fD(cm.conCap)+" of build-period interest added to the loan.":""}
           </div>
         </div>
-        <div style={{flex:"1 1 220px",minWidth:200}}>
-          <label htmlFor="cLoc" style={{display:"block",fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,marginBottom:5}}>Label <span style={{textTransform:"none",letterSpacing:0,fontWeight:400}}>(optional)</span></label>
-          <input id="cLoc" className="fld" type="text" value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="e.g. Portland — Alberta" style={{width:"100%",background:LT.card,border:"1px solid "+LT.border,borderRadius:6,padding:"9px 12px",color:LT.text,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
+
+        {/* Loan term (or how far to look when paying cash) */}
+        <div>
+          {loanAmt>0?(<>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+              <span style={fieldLabel}>Loan term</span>
+              <span style={fieldValue}>{term} years · {rate.toFixed(1)}%</span>
+            </div>
+            <input type="range" aria-label="Loan term in years" min={5} max={20} step={1} value={term} onChange={e=>setTerm(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"6px 0 0"}}/>
+            <Presets value={term} onPick={setTerm} options={[[5,"5 yr"],[10,"10 yr"],[15,"15 yr"],[20,"20 yr"]]}/>
+            <div style={fieldNote}>{term<=10?"Shorter loans cost more per month but less in total interest.":"Longer loans lower the payment but cost more interest over time."} The rate is set in the Full model.</div>
+          </>):(<>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+              <span style={fieldLabel}>Years to evaluate</span>
+              <span style={fieldValue}>{horizon} years</span>
+            </div>
+            <input type="range" aria-label="Years to evaluate" min={5} max={30} step={1} value={horizon} onChange={e=>setHorizon(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"6px 0 0"}}/>
+            <Presets value={horizon} onPick={setHorizon} options={[[5,"5 yr"],[10,"10 yr"],[20,"20 yr"],[30,"30 yr"]]}/>
+            <div style={fieldNote}>With no loan, this sets how far out the returns and the full picture are measured.</div>
+          </>)}
         </div>
       </div>
-      </>)}
-    </div>
-
-    {/* DOWN PAYMENT SLIDER — consumer-facing, syncs with internal */}
-    <div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-        <span style={{fontSize:12,color:LT.body}}>How much do you want to put down?</span>
-        <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text}}>{cashDown===0?"$0 down":cashDown===100?"All cash ("+fD(total)+")":fD(cashDownAmt)+" ("+cashDown+"%)"}</span>
-      </div>
-      <input type="range" aria-label="Down payment percent" min={0} max={100} step={5} value={cashDown} onChange={e=>setCashDown(parseFloat(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:0}}/>
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
-        <span style={{fontSize:11,color:LT.muted}}>$0 down</span>
-        <span style={{fontSize:11,color:LT.muted}}>All cash</span>
-      </div>
-      <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}} className="no-print">
-        {[{v:0,l:"$0 down"},{v:20,l:"20%"},{v:50,l:"50%"},{v:100,l:"All cash"}].map(p=>(
-          <button key={p.v} onClick={()=>setCashDown(p.v)} style={{padding:"5px 12px",borderRadius:6,fontSize:11,fontWeight:cashDown===p.v?600:500,cursor:"pointer",userSelect:"none",border:"1px solid "+(cashDown===p.v?LT.info:LT.border),background:cashDown===p.v?LT.info:LT.card,color:cashDown===p.v?LT.card:LT.body,transition:"all 0.15s",fontFamily:"inherit"}}>{p.l}</button>
-        ))}
-      </div>
-      <div style={{fontSize:11,color:LT.muted,marginTop:10,lineHeight:1.5}}>
-        {cashDown===0?"100% financed at "+rate.toFixed(1)+"%. Monthly payment: "+fD(loanPmt)+". No cash out of pocket.":cashDown===100?"No loan needed — you own the ADU outright from day one. All returns are pure cash flow.":fD(cashDownAmt)+" cash + "+fD(loanAmt)+" financed at "+rate.toFixed(1)+"%. Monthly payment: "+fD(loanPmt)+"."}
-        {cm.conPaid>0?" Plus about "+fD(cm.conPaid)+" of interest-only payments on the funds drawn during the "+buildMonths+"-month build.":cm.conCap>0?" Includes about "+fD(cm.conCap)+" of construction-period interest added to the loan.":""}
-      </div>
-    </div>
-
-    {loanAmt>0?(<>
-    {/* INTEREST RATE — read-only here; only adjustable in the Full model */}
-    <div style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-      <div>
-        <div style={{fontSize:12,color:LT.body,marginBottom:2}}>Interest rate on your loan</div>
-        <div style={{fontSize:11,color:LT.muted}}>Fixed for this estimate — adjustable in the Full model.</div>
-      </div>
-      <span style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:LT.text}}>{rate.toFixed(1)}%</span>
-    </div>
-
-    {/* LOAN TERM SLIDER — consumer-facing, syncs with internal */}
-    <YearsCard title="How long is your loan?" value={term} onChange={setTerm} min={5} max={20} presets={[5,10,15,20]} unit="-year loan" aria="Loan term in years"
-      note={term<=10?"Shorter loan = higher monthly payments but less interest paid overall. Monthly payment: "+fD(loanPmt)+".":"Longer loan = lower monthly payments ("+fD(loanPmt)+") but more interest paid over time."}/>
-    </>):(
-    /* ALL CASH — no loan, so choose how many years of ownership to evaluate instead */
-    <YearsCard title="How many years should we look at?" value={horizon} onChange={setHorizon} min={5} max={30} presets={[5,10,20,30]} unit=" years" aria="Years to evaluate"
-      note={"With no loan, this only sets how far out the summary looks — returns, cash collected and the full picture are measured at year "+horizon+" of renting."}/>
-    )}
     </div>
 
     {!hasCustom&&!isSTR&&(
-      <div style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
-        <div style={{fontSize:36,marginBottom:12}}>↑</div>
-        <div style={{fontSize:17,fontWeight:600,color:LT.text,marginBottom:8}}>Enter your estimated rent to see the analysis</div>
-        <div style={{fontSize:13,color:LT.body,lineHeight:1.6,maxWidth:420,margin:"0 auto"}}>The full breakdown — monthly cash flow, equity buildup, payback period, and stress tests — appears once you provide a rent estimate for your specific area. Even a rough number works; you can refine it later.</div>
+      <div style={{...ltCard,padding:"40px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
+        <div style={{fontSize:17,fontWeight:600,color:LT.text,marginBottom:8}}>Enter the rent you'd charge to see the analysis</div>
+        <div style={{fontSize:13,color:LT.body,lineHeight:1.6,maxWidth:440,margin:"0 auto"}}>The verdict, monthly cash flow, equity buildup, payback period and stress tests appear once you give a rent estimate. Even a rough number works; you can refine it later.</div>
       </div>
     )}
 
@@ -1558,7 +1544,7 @@ function App(){
         </>)}
       </>)}
 
-      {view==="consumer"&&cm&&(<ConsumerView cm={cm} rentY1={grossY1} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
+      {view==="consumer"&&cm&&(<ConsumerView cm={cm} verdict={rep?rep.verdict:null} rentY1={grossY1} unitNoun={ptype.noun} grm={grm} total={total} loanPmt={loanPmt} loanAmt={loanAmt} cashDownAmt={cashDownAmt} rate={rate} term={term} setTerm={set("term")} horizon={horizon} setHorizon={set("horizon")} growth={growth} buildMonths={buildMonths} sqft={sqft} utype={utype} isSTR={isSTR} hasCustom={hasCustom} sizeAnchor={sizeAnchor} rentLo={rentLo} rentHi={rentHi} customName={customName} cashDown={cashDown} setCashDown={set("cashDown")} incomeTax={incomeTax} customRent={customRent} setCustomRent={set("customRent")} setCustomName={set("customName")} copied={copied} copyShare={copyShare} />)}
 
       </div>
     </div>

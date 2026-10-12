@@ -227,6 +227,17 @@ describe("construction-period interest", () => {
 });
 
 describe("consumer summary", () => {
+  test("leads with the verdict, then one compact scenario card", async () => {
+    const p = await load("?customRent=2600&cashDown=20&view=consumer");
+    const t = p.text();
+    assert.match(t, /Your ADU Investment Summary.*The short answerAt \$2,600\/mo rent, this \$[\d,]+ project.*Your scenarioMonthly rent.*Down payment\$59,830 \(20%\).*Loan term10 years · 7\.5%.*Estimated total return/);
+    assert.equal(p.doc.querySelectorAll(".screen-only input[type=range]").length >= 3, true);
+  });
+  test("asks for rent before showing a verdict", async () => {
+    const t = (await load("?sqft=600&view=consumer")).text();
+    assert.doesNotMatch(t, /The short answer/);
+    assert.match(t, /Monthly rent — required.*Enter the rent you'd charge to see the analysis/);
+  });
   test("one 'full picture' card covers value, cash flow and ongoing income", async () => {
     const t = (await load("?customRent=2600&cashDown=20&view=consumer")).text();
     assert.doesNotMatch(t, /What you have/);
@@ -462,8 +473,8 @@ describe("stress tests", () => {
 describe("all-cash consumer view", () => {
   test("hides loan-only cards and offers a horizon instead", async () => {
     const t = (await load("?customRent=2600&cashDown=100&view=consumer")).text();
-    assert.doesNotMatch(t, /Interest rate on your loan|How long is your loan|Loan paid off|Life after the loan/);
-    assert.match(t, /How many years should we look at\?/);
+    assert.doesNotMatch(t, /Loan term|Loan paid off|Life after the loan/);
+    assert.match(t, /Years to evaluate10 years/);
     assert.match(t, /paid in cash/);
   });
   test("the horizon sets how far out the summary looks", async () => {
