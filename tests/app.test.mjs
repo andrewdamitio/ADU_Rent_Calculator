@@ -844,6 +844,11 @@ describe("printed report", () => {
     assert.equal(svgs.length, 2);
     for (const svg of svgs) { assert.ok(svg.getAttribute("viewBox")); assert.equal(svg.style.width, "100%"); }
   });
+  test("headings are in Title Case", async () => {
+    const r = (await load("?customRent=2600&cashDown=20&cmpOn=1")).report();
+    const heads = [...r.querySelectorAll("h2")].map(h => h.textContent);
+    assert.deepEqual(heads, ["Project Cost", "Return Summary at Loan Payoff", "Financing", "Operating Assumptions", "Cash Position Over Time", "Net Equity Over Time", "Stress Tests", "Financing Options Compared", "Annual Projection", "Notes and Method"]);
+  });
   test("asks for a rent when there isn't one", async () => {
     assert.match((await load("?sqft=600")).report().textContent, /Enter the rent/);
   });

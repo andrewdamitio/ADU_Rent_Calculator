@@ -700,24 +700,24 @@ function PrintReport({rep}){
 
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
       <div>
-        <H2>Project cost</H2>
+        <H2>Project Cost</H2>
         <KV rows={[...rep.costRows.map(([k,v])=>[k,fD(v)]),["Total project cost",fD(rep.total),true]]}/>
         <div style={{fontSize:9,color:RP.muted,marginTop:4}}>Likely final cost {fD(rep.costRange.lo)}–{fD(rep.costRange.hi)} (80% range; {rep.costRange.note}). {rep.loanAmt>0?fD(rep.cashDownAmt)+" down, "+fD(rep.loanAmt)+" financed.":"Paid in cash."}</div>
-        <H2>Return summary{rep.loanAmt>0?" at loan payoff":" after "+rep.evalYrs+" years"}</H2>
+        <H2>Return Summary{rep.loanAmt>0?" at Loan Payoff":" After "+rep.evalYrs+" Years"}</H2>
         <KV rows={[...ledger.map(([k,v])=>[k,(Math.round(v)>0?"+":"")+fD(v)]),["Total return",(cm.ret>=0?"+":"")+fD(cm.ret),true]]}/>
         <div style={{fontSize:9,color:RP.muted,marginTop:4}}>{cm.roi===null?"":cm.roi.toFixed(1)+"%/yr compound on the "+fD(rep.total)+" project cost"}{cm.roiCash!==null&&rep.loanAmt>0?"; "+cm.roiCash.toFixed(1)+"%/yr on the "+fD(rep.cashDownAmt)+" invested":""}. Afterward the ADU nets about {fD(cm.postLoan.net)}/mo, growing with rent.</div>
       </div>
       <div>
         <H2>Financing</H2>
         <KV rows={rep.finRows}/>
-        <H2>Operating assumptions</H2>
+        <H2>Operating Assumptions</H2>
         <KV rows={rep.opRows}/>
       </div>
     </div>
 
     {/* PAGE 2 — over time */}
     <div style={{breakBefore:"page"}}>
-      <H2 first>Cash position over time</H2>
+      <H2 first>Cash Position Over Time</H2>
       <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Cumulative money in and out of pocket: down payment, then each month's rent after expenses, loan payments{rep.incomeTax>0?" and income tax":""}. Payback is where the line crosses zero.</div>
       <TimeChart pts={cm.pts} height={210} ariaLabel="Cumulative cash position by year"
         series={[{key:"cash",color:"#15803d",width:2}]} area={{pos:"#15803d",neg:"#b45309"}}
@@ -725,7 +725,7 @@ function PrintReport({rep}){
         vlines={rep.loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]}
         marker={cm.po>0&&cm.po!==Infinity?{x:cm.po,label:"Payback yr "+cm.po.toFixed(1),color:"#15803d"}:null}
         tooltip={()=>null}/>
-      <H2>Net equity over time</H2>
+      <H2>Net Equity Over Time</H2>
       <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Estimated ADU value, minus loan balance, plus cash position.{rep.buildMonths>0?" The ADU is valued at $0 until it's finished (shaded build period), since a half-built ADU can't be rented or appraised the normal way.":""}</div>
       <TimeChart pts={cm.pts} height={210} band={rep.buildMonths>0?{to:rep.buildMonths/12,label:"Building — not valued yet"}:null} ariaLabel="Net equity by year"
         series={[{key:"tot",color:RP.accent,width:2.5},{key:"value",color:"#b45309",dash:"2,4",opacity:0.8},{key:"loanNeg",color:"#b91c1c",dash:"4,3",opacity:0.7},{key:"cash",color:"#15803d",dash:"4,3",opacity:0.8}]}
@@ -734,7 +734,7 @@ function PrintReport({rep}){
         {[["Net equity",RP.accent,"solid"],["ADU value","#b45309","dotted"],["Loan balance","#b91c1c","dashed"],["Cash position","#15803d","dashed"]].map(([l,c,s])=><span key={l}><span style={{display:"inline-block",width:16,borderTop:"2px "+s+" "+c,verticalAlign:"middle",marginRight:4}}/>{l}</span>)}
       </div>
 
-      <H2>Stress tests</H2>
+      <H2>Stress Tests</H2>
       <table style={{width:"100%",borderCollapse:"collapse"}}>
         <thead><tr>{["Scenario","Cash-flow positive","Payback","Total return","vs. base"].map((h,i)=><th key={h} style={{...th,textAlign:i?"right":"left"}}>{h}</th>)}</tr></thead>
         <tbody>{cm.stress.map((t,i)=>(<tr key={t.label} style={{borderBottom:"1px solid "+RP.faint,fontWeight:i===0?700:400}}>
@@ -745,13 +745,13 @@ function PrintReport({rep}){
           <td style={{...td,color:i===0?RP.muted:RP.neg}}>{i===0?"—":fShort(t.ret-cm.stress[0].ret)}</td>
         </tr>))}</tbody>
       </table>
-      {rep.cmp&&<div style={{breakInside:"avoid"}}><H2>Financing options compared</H2><FinCompareTable cols={rep.cmp} theme="print"/><div style={{fontSize:9,color:RP.muted,marginTop:4}}>Same project, different financing; best figure per row highlighted. Rates are estimates — confirm with lenders.</div></div>}
+      {rep.cmp&&<div style={{breakInside:"avoid"}}><H2>Financing Options Compared</H2><FinCompareTable cols={rep.cmp} theme="print"/><div style={{fontSize:9,color:RP.muted,marginTop:4}}>Same project, different financing; best figure per row highlighted. Rates are estimates — confirm with lenders.</div></div>}
       <div style={{fontSize:9,color:RP.muted,marginTop:4}}>Each test changes one assumption and holds the rest.{cm.stress.some(t=>t.cfAtTerm)?" * Positive only once the loan is paid off.":""}</div>
     </div>
 
     {/* PAGE 3 — annual projection and notes */}
     <div style={{breakBefore:"page"}}>
-      <H2 first>Annual projection</H2>
+      <H2 first>Annual Projection</H2>
       <div style={{fontSize:9.5,color:RP.body,marginBottom:6}}>US dollars; negatives in parentheses. Flows are annual totals by rental year; balances and values are at year end. Year 0 is {rep.buildMonths>0?"the "+rep.buildMonths+"-month construction period":"the start, when the down payment is made"}{cm.conPaid>0?"; its loan payments are interest on construction draws":""}.</div>
       <table style={{width:"100%",borderCollapse:"collapse"}}>
         <thead><tr>{cols.map((h,i)=><th key={h} style={{...th,textAlign:i?"right":"left"}}>{h}</th>)}</tr></thead>
@@ -781,7 +781,7 @@ function PrintReport({rep}){
       </table>
       {rep.loanAmt>0&&<div style={{fontSize:9,color:RP.muted,marginTop:4}}>Shaded row: final year of the {rep.term}-year loan.</div>}
 
-      <H2>Notes and method</H2>
+      <H2>Notes and Method</H2>
       <ul style={{margin:"4px 0 0",paddingLeft:16,fontSize:9.5,color:RP.body,lineHeight:1.55}}>
         {rep.notes.map((n,i)=><li key={i} style={{marginBottom:3}}>{n}</li>)}
       </ul>
