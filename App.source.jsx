@@ -180,7 +180,7 @@ const PTYPES={
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
 const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,clientName:"",clientAddr:"",prepName:"",prepCompany:"",reportNotes:"",cmpOn:false,
-  cmpBOn:true,cmpBName:"30-yr cash-out refi",cmpBRate:7,cmpBTerm:30,cmpBDown:0,cmpBFee:3,
+  cmpBOn:true,cmpBName:"Home equity loan, 15 yr",cmpBRate:8,cmpBTerm:15,cmpBDown:0,cmpBFee:2,
   cmpCOn:true,cmpCName:"HELOC, 20 yr",cmpCRate:8.5,cmpCTerm:20,cmpCDown:0,cmpCFee:0,
   cmpDOn:true,cmpDName:"All cash",cmpDRate:0,cmpDTerm:10,cmpDDown:100,cmpDFee:0,hookupCity:"ca",saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
@@ -196,7 +196,7 @@ function shareUrlFor(state){
 }
 // Valid ranges for numeric fields. Anything loaded from a URL or storage — or typed into a
 // value — is clamped to these. Cost lines go well past their sliders so a real quote always fits.
-const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,30],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],cmpBRate:[0,25],cmpCRate:[0,25],cmpDRate:[0,25],cmpBTerm:[5,30],cmpCTerm:[5,30],cmpDTerm:[5,30],cmpBDown:[0,100],cmpCDown:[0,100],cmpDDown:[0,100],cmpBFee:[0,40],cmpCFee:[0,40],cmpDFee:[0,40],saleYear:[1,30],sellCost:[0,12],incomeTax:[0,50],customRent:[0,100000]};
+const LIM={sqft:[300,1200],cpsf:[50,1500],permits:[0,300000],hookup:[0,300000],foundation:[0,500000],sitePrep:[0,500000],utilTrench:[0,500000],electrical:[0,100000],hardscape:[0,200000],design:[0,300000],surveys:[0,100000],contingency:[0,20],markup:[0,40],strADR:[25,3000],strGrowth:[0,6],strCosts:[3,40],strVacancy:[5,40],strMonths:[1,6],furnishing:[0,200000],trenchFt:[0,1000],cashDown:[0,100],origFee:[1,40],rate:[0,25],term:[5,20],buildMonths:[0,18],conPremium:[0,3],horizon:[5,30],taxRate:[0.5,3],taxGrowth:[0,6],insurance:[0.2,3.5],insGrowth:[0,15],maint:[3,15],vacancy:[0,12],mgmt:[0,12],growth:[0,6],grm:[50,400],cmpBRate:[0,25],cmpCRate:[0,25],cmpDRate:[0,25],cmpBTerm:[5,20],cmpCTerm:[5,20],cmpDTerm:[5,20],cmpBDown:[0,100],cmpCDown:[0,100],cmpDDown:[0,100],cmpBFee:[0,40],cmpCFee:[0,40],cmpDFee:[0,40],saleYear:[1,30],sellCost:[0,12],incomeTax:[0,50],customRent:[0,100000]};
 const INT_KEYS=new Set(["cmpBTerm","cmpCTerm","cmpDTerm","saleYear","trenchFt","term","strMonths","buildMonths","horizon"]);
 const ENUMS={hookupCity:["ca","austin","denver","portland"],projectType:Object.keys(PTYPES),siteMode:["facts","dollars"],fdn:["new","existing","none"],slope:["flat","gentle","moderate","steep"],soil:["known","unknown","clay","rock"],access:["open","side","tight"],demo:["none","small","structure"],panel:["room","full","small"],boundary:["needed","have"],rentalMode:["ltr","hybrid","str"],conIntMode:["paid","cap","none"]};
 function cleanField(k,raw){
@@ -893,7 +893,7 @@ function FinCompare({state,set,cols}){
               style={{width:"100%",boxSizing:"border-box",padding:"5px 8px",background:"#161b22",border:"1px solid #30363d",borderRadius:5,color:"#e6edf3",fontSize:12.5,fontWeight:600,fontFamily:"inherit",marginBottom:8}}/>
             {on&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
               <CmpNum label={"Option "+a+" rate"} value={state["cmp"+a+"Rate"]} onChange={set("cmp"+a+"Rate")} lo={0} hi={25} step={0.125} suffix="Rate %"/>
-              <CmpNum label={"Option "+a+" term"} value={state["cmp"+a+"Term"]} onChange={v=>set("cmp"+a+"Term")(Math.round(v))} lo={5} hi={30} step={1} suffix="Term (years)"/>
+              <CmpNum label={"Option "+a+" term"} value={state["cmp"+a+"Term"]} onChange={v=>set("cmp"+a+"Term")(Math.round(v))} lo={5} hi={20} step={1} suffix="Term (years)"/>
               <CmpNum label={"Option "+a+" down payment"} value={state["cmp"+a+"Down"]} onChange={set("cmp"+a+"Down")} lo={0} hi={100} step={5} suffix="Down %"/>
               <CmpNum label={"Option "+a+" fee"} value={state["cmp"+a+"Fee"]} onChange={set("cmp"+a+"Fee")} lo={0} hi={40} step={0.5} suffix="Fees %"/>
             </div>}
@@ -977,8 +977,8 @@ function ConsumerView({cm,costRange,preparedFor,preparedBy,cmpCols,verdict,saleO
               <span style={fieldLabel}>Loan term</span>
               <span style={fieldValue}>{term} years · {rate.toFixed(1)}%</span>
             </div>
-            <input type="range" aria-label="Loan term in years" min={5} max={30} step={1} value={term} onChange={e=>setTerm(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"6px 0 0"}}/>
-            <Presets value={term} onPick={setTerm} options={[[10,"10 yr"],[15,"15 yr"],[20,"20 yr"],[30,"30 yr"]]}/>
+            <input type="range" aria-label="Loan term in years" min={5} max={20} step={1} value={term} onChange={e=>setTerm(parseInt(e.target.value))} style={{width:"100%",accentColor:LT.info,height:6,cursor:"pointer",margin:"6px 0 0"}}/>
+            <Presets value={term} onPick={setTerm} options={[[5,"5 yr"],[10,"10 yr"],[15,"15 yr"],[20,"20 yr"]]}/>
             <div style={fieldNote}>{term<=10?"Shorter loans cost more per month but less in total interest.":"Longer loans lower the payment but cost more interest over time."} The rate is set in the Full model.</div>
           </>):(<>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
@@ -1684,7 +1684,7 @@ function App(){
             <TS label="Cash / equity down" value={cashDown} onChange={set("cashDown")} typeMin={LIM.cashDown[0]} typeMax={LIM.cashDown[1]} min={0} max={100} step={5} format={v=>v===0?"100% financed":v+"% ("+fD(cashDownAmt)+")"} ticks={[{value:0,label:"All loan",color:tb},{value:20,label:"20%",color:tk},{value:50,label:"50/50",color:tk},{value:100,label:"All cash",color:gn}]}/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18}}>
               <Sl label="Interest rate" value={rate} onChange={set("rate")} typeMin={LIM.rate[0]} typeMax={LIM.rate[1]} min={3} max={14} step={0.5} format={v=>v.toFixed(1)+"%"}/>
-              {isCash?<Sl label="Years to evaluate" value={horizon} onChange={set("horizon")} typeMin={LIM.horizon[0]} typeMax={LIM.horizon[1]} min={5} max={30} step={1} format={v=>v+" yr"}/>:<Sl label="Loan term" value={term} onChange={set("term")} typeMin={LIM.term[0]} typeMax={LIM.term[1]} min={5} max={30} step={1} format={v=>v+" yr"}/>}
+              {isCash?<Sl label="Years to evaluate" value={horizon} onChange={set("horizon")} typeMin={LIM.horizon[0]} typeMax={LIM.horizon[1]} min={5} max={30} step={1} format={v=>v+" yr"}/>:<Sl label="Loan term" value={term} onChange={set("term")} typeMin={LIM.term[0]} typeMax={LIM.term[1]} min={5} max={20} step={1} format={v=>v+" yr"}/>}
             </div>
             <div style={{marginTop:2}}>
               <Tog on={origFeeOn} onToggle={()=>set("origFeeOn")(!origFeeOn)} label="Loan origination / dealer fee" sub={origFeeOn?"Baked into the project price — like solar, the fee is invisible to the borrower":"Off — no origination fee (e.g. HELOC, credit union loan)"}/>

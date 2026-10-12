@@ -301,17 +301,17 @@ describe("financing comparison", () => {
     const rows = Object.fromEntries([...t.querySelectorAll("tbody tr")].map(tr => [tr.children[0].textContent, [...tr.children].slice(1).map(td => td.textContent)]));
     return { heads, rows, t };
   };
-  test("off by default; loan terms go to 30 years", async () => {
+  test("off by default; loan terms stop at 20 years (this isn't a mortgage)", async () => {
     const p = await load("?customRent=2600&term=30&view=consumer");
     assert.equal(table(p.doc.querySelector(".screen-only")), null);
-    assert.match(p.text(), /Loan term30 years · 7\.5%/);
+    assert.match(p.text(), /Loan term20 years · 7\.5%/);
   });
   test("compares the current setup with each alternative, in all three places", async () => {
     const p = await load("?customRent=2600&cashDown=20&cmpOn=1");
     const f = table(p.doc.querySelector(".screen-only"));
-    assert.deepEqual(f.heads, ["Your setup", "30-yr cash-out refi", "HELOC, 20 yr", "All cash"]);
+    assert.deepEqual(f.heads, ["Your setup", "Home equity loan, 15 yr", "HELOC, 20 yr", "All cash"]);
     const pay = f.rows["Monthly payment"].map(v => money(v));
-    assert.ok(pay[1] < pay[0], "a 30-year loan has a lower payment than the 10-year setup");
+    assert.ok(pay[2] < pay[0], "the 20-year HELOC has a lower payment than the 10-year setup");
     assert.equal(f.rows["Monthly payment"][3], "No loan");
     assert.equal(f.t.querySelectorAll("td[style*='font-weight: 700']").length, 7, "one best value per row");
     const c = await load("?customRent=2600&cashDown=20&cmpOn=1&view=consumer");
@@ -328,7 +328,7 @@ describe("financing comparison", () => {
     const p = await load("?customRent=2600&cmpOn=1&cmpCOn=0&cmpBName=Credit%20union&cmpBRate=6.5");
     const f = table(p.doc.querySelector(".screen-only"));
     assert.deepEqual(f.heads, ["Your setup", "Credit union", "All cash"]);
-    assert.match(f.t.textContent, /6\.5% · 30 yr/);
+    assert.match(f.t.textContent, /6\.5% · 15 yr/);
   });
 });
 
