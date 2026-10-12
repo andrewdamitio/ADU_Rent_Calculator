@@ -659,34 +659,16 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
       </div>
     </div>
 
-    {/* WHAT YOU KEEP */}
+    {/* THE FULL PICTURE — what you put in, what you got, what you keep */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
-      <div style={{...secH,marginBottom:14}}>{loanAmt>0?"What you have when the loan is paid off":"What you have after "+cm.evalYrs+" years"}</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:24}}>
-        {[
-          ["A fully-paid ADU asset",<>Estimated value: <strong style={{color:LT.text}}>{fD(cm.valueEnd)}</strong> (rent-multiplier method)</>],
-          ["Ongoing rental income",<>About <strong style={{color:LT.text}}>{fD(post.net)}/mo</strong> net{loanAmt>0?", with no loan payment":""}</>],
-          ["Cumulative cash flow",<>Approximately <strong style={{color:cm.cashCollected>=0?LT.pos:LT.warn}}>{cm.cashCollected>=0?"+":""}{fK2(cm.cashCollected)}</strong> {cm.cashCollected>=0?"collected":"in net subsidies"} {loanAmt>0?"over the loan term":"over "+cm.evalYrs+" years"}</>],
-          ["Multigenerational flexibility","You can house family, age in place, or change use without selling"],
-        ].map(([h,s])=>(
-          <div key={h} style={{display:"flex",alignItems:"baseline",gap:8}}>
-            <div style={{fontSize:12,color:LT.muted,minWidth:14}}>✓</div>
-            <div><div style={{fontSize:14,fontWeight:600,color:LT.text}}>{h}</div><div style={{fontSize:12.5,color:LT.body,lineHeight:1.5}}>{s}</div></div>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    {/* TOTAL ECONOMICS SUMMARY */}
-    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
-      <div style={{...secH,marginBottom:14}}>{loanAmt>0?"The full picture at loan payoff":"The full picture after "+cm.evalYrs+" years"}</div>
+      <div style={{...secH,marginBottom:14}}>{loanAmt>0?"The full picture when the loan is paid off":"The full picture after "+cm.evalYrs+" years"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:0}}>
         {[
           {label:"Cash you invested"+(cashDownAmt>0?" ("+cashDown+"% down)":""),value:-cashDownAmt,sub:cashDownAmt===0?"100% financed — no cash out of pocket":loanAmt>0?"The rest is financed at "+rate.toFixed(1)+"%":"Paid in full, no loan",color:LT.text,icon:"↓"},
           ...(cm.conPaid>0?[{label:"Construction-period interest",value:-cm.conPaid,sub:"Interest-only payments on the funds drawn during the "+buildMonths+"-month build",color:LT.warn,icon:"−"}]:[]),
           {label:"Cumulative net cash flow",value:cm.cashCollected,sub:cm.cashCollected>=0?"Rent after expenses"+taxNote+(loanAmt>0?" exceeded your loan payments":""):(cm.subsidies>0?"You covered "+fD(cm.subsidies)+" of monthly shortfalls along the way":"Monthly shortfalls before rent caught up"),color:cm.cashCollected>=0?LT.pos:LT.warn,icon:cm.cashCollected>=0?"+":"−"},
-          {label:"Property value created",value:cm.valueEnd,sub:"Estimated ADU contribution to home value ("+fD(cm.valueY1)+" when complete, growing to "+fK2(cm.valueEnd)+")",color:LT.pos,icon:"+"},
-          {label:"Total return",value:cm.ret,sub:(cm.roi===null?"":cm.roi.toFixed(1)+"%/yr compound on the "+fD(total)+" project cost")+(cm.roiCash!==null?" ("+cm.roiCash.toFixed(1)+"%/yr on the "+fD(cashDownAmt)+" you put in)":", with no cash out of pocket")+" — and the ADU keeps generating "+fD(post.net)+"/mo",color:cm.ret>=0?LT.pos:LT.neg,icon:"=",bold:true},
+          {label:loanAmt>0?"A fully paid-off ADU":"The ADU's value",value:cm.valueEnd,sub:"Estimated contribution to your home's value ("+fD(cm.valueY1)+" when complete, growing with rent) — rent-multiplier method",color:LT.pos,icon:"+"},
+          {label:"Total return",value:cm.ret,sub:(cm.roi===null?"":cm.roi.toFixed(1)+"%/yr compound on the "+fD(total)+" project cost")+(cm.roiCash!==null?" ("+cm.roiCash.toFixed(1)+"%/yr on the "+fD(cashDownAmt)+" you put in)":", with no cash out of pocket"),color:cm.ret>=0?LT.pos:LT.neg,icon:"=",bold:true},
         ].map((item,i)=>(<div key={i} style={{display:"flex",alignItems:"flex-start",padding:item.bold?"14px 16px":"11px 16px",borderBottom:!item.bold?"1px solid "+LT.borderLight:"none",background:item.bold?(cm.ret>=0?LT.posBg:LT.negBg):"transparent",borderRadius:item.bold?8:0}}>
           <span style={{fontSize:item.bold?16:14,color:LT.muted,width:22,textAlign:"center",fontWeight:600,marginTop:2}}>{item.icon}</span>
           <div style={{flex:1,marginLeft:8}}>
@@ -695,6 +677,18 @@ function ConsumerView({cm,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,ho
           </div>
           <span style={{fontFamily:"'Fraunces',serif",fontSize:item.bold?24:17,fontWeight:700,color:item.color,marginLeft:12,whiteSpace:"nowrap"}}>{Math.round(item.value)===0?"$0":(item.value>=0?"+":"")+fK2(item.value)}</span>
         </div>))}
+      </div>
+      {/* What you keep going forward — not part of the total above */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginTop:16,paddingTop:14,borderTop:"1px solid "+LT.border}}>
+        {[
+          ["Ongoing rental income",<>About <strong style={{color:post.net>=0?LT.pos:LT.warn}}>{fD(post.net)}/mo</strong> net{loanAmt>0?" with no loan payment":""}, growing with rent</>],
+          ["Multigenerational flexibility","House family, age in place, or change how you use it without selling"],
+        ].map(([h,s])=>(
+          <div key={h} style={{display:"flex",alignItems:"baseline",gap:8}}>
+            <div style={{fontSize:12,color:LT.pos,minWidth:14}}>✓</div>
+            <div><div style={{fontSize:13.5,fontWeight:600,color:LT.text}}>{h}</div><div style={{fontSize:12.5,color:LT.body,lineHeight:1.5}}>{s}</div></div>
+          </div>
+        ))}
       </div>
     </div>
 

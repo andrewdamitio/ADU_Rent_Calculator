@@ -210,6 +210,14 @@ describe("construction-period interest", () => {
   });
 });
 
+describe("consumer summary", () => {
+  test("one 'full picture' card covers value, cash flow and ongoing income", async () => {
+    const t = (await load("?customRent=2600&cashDown=20&view=consumer")).text();
+    assert.doesNotMatch(t, /What you have/);
+    assert.match(t, /The full picture when the loan is paid off.*A fully paid-off ADU.*Total return.*Ongoing rental income.*Multigenerational flexibility/);
+  });
+});
+
 describe("all-cash consumer view", () => {
   test("hides loan-only cards and offers a horizon instead", async () => {
     const t = (await load("?customRent=2600&cashDown=100&view=consumer")).text();
