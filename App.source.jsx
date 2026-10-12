@@ -345,9 +345,184 @@ const SRC=[
 const LT={bg:"#f8fafc",card:"#ffffff",border:"#e2e8f0",borderLight:"#f1f5f9",text:"#0f172a",body:"#475569",muted:"#64748b",mutedLight:"#94a3b8",pos:"#16a34a",posBg:"#dcfce7",info:"#2563eb",infoBg:"#dbeafe",warn:"#d97706",warnBg:"#fef3c7",neg:"#dc2626",negBg:"#fee2e2"};
 const ltCard={background:LT.card,border:"1px solid "+LT.border,borderRadius:12,boxShadow:"0 1px 3px rgba(15,23,42,0.04)"};
 
+// Shared page header for both views, so the actions sit in the same place: an optional
+// Reset, then Print, then Copy model link as the rightmost (primary) button.
+function PageHeader({dark,title,subtitle,copied,onCopy,onReset,confirmReset}){
+  const btn={borderRadius:8,fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",transition:"background 0.15s, border-color 0.15s"};
+  const sec=dark?{...btn,background:"transparent",border:"1px solid #30363d",color:"#c9d1d9"}:{...btn,background:LT.card,border:"1px solid "+LT.border,color:LT.body};
+  const pri=dark
+    ?{...btn,background:copied?"rgba(63,185,80,0.15)":tb,border:"1px solid "+(copied?gn:tb),color:copied?gn:"#0d1117"}
+    :{...btn,background:copied?LT.posBg:LT.info,border:"1px solid "+(copied?LT.pos:LT.info),color:copied?LT.pos:"#fff"};
+  const warn=dark?{...sec,background:"rgba(248,81,73,0.15)",border:"1px solid "+rd,color:rd}:{...sec,background:LT.negBg,border:"1px solid "+LT.neg,color:LT.neg};
+  return(<div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}>
+    <div style={{flex:"1 1 320px",minWidth:0}}>
+      <h1 style={{fontFamily:"'Fraunces',serif",fontSize:30,fontWeight:700,margin:"0 0 6px",letterSpacing:"-0.02em",color:dark?"#e6edf3":LT.text}}>{title}</h1>
+      <p style={{color:dark?"#8b949e":LT.body,fontSize:14,margin:0,lineHeight:1.5}}>{subtitle}</p>
+    </div>
+    <div className="no-print" style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap",marginLeft:"auto"}}>
+      {onReset&&<button type="button" onClick={onReset} style={confirmReset?warn:sec}>{confirmReset?"Click again to confirm":"Reset all"}</button>}
+      <button type="button" onClick={()=>window.print()} style={sec}>Print / Save as PDF</button>
+      <button type="button" onClick={onCopy} style={pri}>{copied?"Model link copied ✓":"Copy model link"}</button>
+    </div>
+  </div>);
+}
+
+// Print-only report: a formal, letter-size readout of the scenario. Screens never see it;
+// printing from either view produces it instead of the interactive page.
+const fShort=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1e6?s+"$"+(a/1e6).toFixed(2)+"M":a>=1000?s+"$"+(a/1000).toFixed(a>=100000?0:1)+"k":s+"$"+Math.round(a)};
+// Accounting style for tables: negatives in parentheses, zero as a dash, no dollar signs (stated in the caption).
+const fAcct=n=>{const r=Math.round(n)||0;return r===0?"—":r<0?"("+Math.abs(r).toLocaleString()+")":r.toLocaleString()};
+const RP={ink:"#0f172a",body:"#334155",muted:"#64748b",rule:"#cbd5e1",faint:"#e2e8f0",band:"#f1f5f9",accent:"#1e3a5f",pos:"#15803d",neg:"#b91c1c"};
+function PrintReport({rep}){
+  if(!rep)return(<div className="print-report" style={{fontFamily:"'DM Sans',sans-serif",color:RP.ink,padding:40}}>Enter the rent you'd charge to generate the report.</div>);
+  const{cm}=rep;
+  const H2=({children,first})=>(<h2 style={{fontFamily:"'Fraunces',serif",fontSize:15,fontWeight:600,color:RP.accent,margin:first?"0 0 8px":"20px 0 8px",paddingBottom:4,borderBottom:"1.5px solid "+RP.accent,breakAfter:"avoid"}}>{children}</h2>);
+  const KV=({rows})=>(<table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5}}><tbody>
+    {rows.map(([k,v,strong],i)=>(<tr key={i} style={{borderBottom:"1px solid "+(strong?RP.rule:RP.faint)}}>
+      <td style={{padding:"4px 0",color:strong?RP.ink:RP.body,fontWeight:strong?700:400}}>{k}</td>
+      <td style={{padding:"4px 0",textAlign:"right",color:RP.ink,fontWeight:strong?700:500,whiteSpace:"nowrap"}}>{v}</td>
+    </tr>))}
+  </tbody></table>);
+  const kpis=[
+    ["Total project cost",fD(rep.total),rep.loanAmt>0?fD(rep.cashDownAmt)+" down · "+fD(rep.loanAmt)+" financed":"Paid in cash"],
+    ["Monthly loan payment",rep.loanAmt>0?fD(rep.loanPmt):"None",rep.loanAmt>0?rep.rate.toFixed(2).replace(/0$/,"")+"% · "+rep.term+" years":"No loan"],
+    ["Year-1 cash flow",(cm.bars[0].net>=0?"+":"")+fD(cm.bars[0].net)+"/mo","Average month"+(rep.loanAmt>0&&rep.incomeTax>0?", after loan and tax":rep.loanAmt>0?", after loan payment":rep.incomeTax>0?", after tax":", after expenses")],
+    ["Cash-flow positive",cm.cfPlus<=0?"Day one":fYr(cm.cfPlus)+(cm.cfAtTerm?"*":""),"From project start"],
+    ["Payback",cm.po===0?"Immediate":fYr(cm.po),"All cash invested returned"],
+    [rep.loanAmt>0?"Net equity at payoff":"Net equity, year "+rep.evalYrs,(cm.ret>=0?"+":"")+fShort(cm.ret),cm.roi===null?"":(cm.roi>=0?"+":"")+cm.roi.toFixed(1)+"%/yr compound on cost"],
+  ];
+  const ledger=[
+    ["Cash invested"+(rep.cashDownAmt>0?" ("+rep.cashDown+"% down)":""),-rep.cashDownAmt],
+    ...(cm.conPaid>0?[["Construction-period interest",-cm.conPaid]]:[]),
+    ["Cumulative net cash flow",cm.cashCollected],
+    [rep.loanAmt>0?"ADU value (loan paid off)":"ADU value",cm.valueEnd],
+  ];
+  const showTax=rep.incomeTax>0;
+  const cols=["Year","Gross rent","Operating costs","Loan payments",...(showTax?["Income tax"]:[]),"Net cash flow","Cumulative cash","Loan balance","ADU value","Net equity"];
+  const th={padding:"5px 4px",fontSize:8.5,fontWeight:700,color:RP.muted,textTransform:"uppercase",letterSpacing:"0.04em",textAlign:"right",borderBottom:"1.5px solid "+RP.ink,verticalAlign:"bottom"};
+  const td={padding:"3.5px 4px",fontSize:9.5,textAlign:"right",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"};
+  const tot=cm.annual.filter(a=>a.year>0).reduce((s,a)=>({rent:s.rent+a.rent,ops:s.ops+a.ops,pay:s.pay+a.pay,tax:s.tax+a.tax,net:s.net+a.net}),{rent:0,ops:0,pay:0,tax:0,net:0});
+  return(<div className="print-report" style={{fontFamily:"'DM Sans',sans-serif",color:RP.ink,background:"#fff",fontSize:10.5,lineHeight:1.45}}>
+    <style>{"@page{@top-left{content:"+JSON.stringify("ADU Investment Analysis — "+rep.title)+";font:9px 'DM Sans',sans-serif;color:#64748b}}"}</style>
+
+    {/* PAGE 1 — summary */}
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:16,paddingBottom:10,borderBottom:"3px solid "+RP.accent}}>
+      <div>
+        <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:RP.accent}}>ADU Investment Analysis</div>
+        <div style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,lineHeight:1.15,marginTop:2}}>{rep.title}</div>
+        <div style={{fontSize:10.5,color:RP.body,marginTop:3}}>{rep.subtitle}</div>
+      </div>
+      <div style={{textAlign:"right",fontSize:9.5,color:RP.muted,lineHeight:1.5}}>
+        <div>Prepared {rep.date}</div>
+        <div>Estimate — not an appraisal or offer of credit</div>
+      </div>
+    </div>
+
+    <p style={{fontSize:11.5,lineHeight:1.55,margin:"12px 0 14px",color:RP.ink}}>{rep.verdict}</p>
+
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",border:"1px solid "+RP.rule,borderRadius:4}}>
+      {kpis.map(([k,v,s],i)=>(<div key={k} style={{padding:"9px 12px",borderRight:i%3<2?"1px solid "+RP.rule:"none",borderBottom:i<3?"1px solid "+RP.rule:"none"}}>
+        <div style={{fontSize:8.5,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:RP.muted}}>{k}</div>
+        <div style={{fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:700,lineHeight:1.2,marginTop:2}}>{v}</div>
+        <div style={{fontSize:9,color:RP.muted}}>{s}</div>
+      </div>))}
+    </div>
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+      <div>
+        <H2>Project cost</H2>
+        <KV rows={[...rep.costRows.map(([k,v])=>[k,fD(v)]),["Total project cost",fD(rep.total),true]]}/>
+        <H2>Return summary{rep.loanAmt>0?" at loan payoff":" after "+rep.evalYrs+" years"}</H2>
+        <KV rows={[...ledger.map(([k,v])=>[k,(Math.round(v)>0?"+":"")+fD(v)]),["Total return",(cm.ret>=0?"+":"")+fD(cm.ret),true]]}/>
+        <div style={{fontSize:9,color:RP.muted,marginTop:4}}>{cm.roi===null?"":cm.roi.toFixed(1)+"%/yr compound on the "+fD(rep.total)+" project cost"}{cm.roiCash!==null&&rep.loanAmt>0?"; "+cm.roiCash.toFixed(1)+"%/yr on the "+fD(rep.cashDownAmt)+" invested":""}. Afterward the ADU nets about {fD(cm.postLoan.net)}/mo, growing with rent.</div>
+      </div>
+      <div>
+        <H2>Financing</H2>
+        <KV rows={rep.finRows}/>
+        <H2>Operating assumptions</H2>
+        <KV rows={rep.opRows}/>
+      </div>
+    </div>
+
+    {/* PAGE 2 — over time */}
+    <div style={{breakBefore:"page"}}>
+      <H2 first>Cash position over time</H2>
+      <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Cumulative money in and out of pocket: down payment, then each month's rent after expenses, loan payments{rep.incomeTax>0?" and income tax":""}. Payback is where the line crosses zero.</div>
+      <TimeChart pts={cm.pts} height={210} ariaLabel="Cumulative cash position by year"
+        series={[{key:"cash",color:"#15803d",width:2}]} area={{pos:"#15803d",neg:"#b45309"}}
+        pointColor={p=>p.cash>=0?"#15803d":"#b45309"}
+        vlines={rep.loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]}
+        marker={cm.po>0&&cm.po!==Infinity?{x:cm.po,label:"Payback yr "+cm.po.toFixed(1),color:"#15803d"}:null}
+        tooltip={()=>null}/>
+      <H2>Net equity over time</H2>
+      <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Estimated ADU value, minus loan balance, plus cash position.</div>
+      <TimeChart pts={cm.pts} height={210} ariaLabel="Net equity by year"
+        series={[{key:"tot",color:RP.accent,width:2.5},{key:"value",color:"#b45309",dash:"2,4",opacity:0.8},{key:"loanNeg",color:"#b91c1c",dash:"4,3",opacity:0.7},{key:"cash",color:"#15803d",dash:"4,3",opacity:0.8}]}
+        area={{pos:RP.accent,neg:RP.accent}} vlines={rep.loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]} tooltip={()=>null}/>
+      <div style={{display:"flex",gap:16,fontSize:9,color:RP.muted,marginTop:2}}>
+        {[["Net equity",RP.accent,"solid"],["ADU value","#b45309","dotted"],["Loan balance","#b91c1c","dashed"],["Cash position","#15803d","dashed"]].map(([l,c,s])=><span key={l}><span style={{display:"inline-block",width:16,borderTop:"2px "+s+" "+c,verticalAlign:"middle",marginRight:4}}/>{l}</span>)}
+      </div>
+
+      <H2>Stress tests</H2>
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead><tr>{["Scenario","Cash-flow positive","Payback","Total return","vs. base"].map((h,i)=><th key={h} style={{...th,textAlign:i?"right":"left"}}>{h}</th>)}</tr></thead>
+        <tbody>{cm.stress.map((t,i)=>(<tr key={t.label} style={{borderBottom:"1px solid "+RP.faint,fontWeight:i===0?700:400}}>
+          <td style={{...td,textAlign:"left"}}>{t.label}</td>
+          <td style={td}>{t.cfPlus<=0?"Day one":fYr(t.cfPlus)+(t.cfAtTerm?"*":"")}</td>
+          <td style={td}>{t.po===0?"Immediate":fYr(t.po)}</td>
+          <td style={td}>{(t.ret>=0?"+":"")+fShort(t.ret)}</td>
+          <td style={{...td,color:i===0?RP.muted:RP.neg}}>{i===0?"—":fShort(t.ret-cm.stress[0].ret)}</td>
+        </tr>))}</tbody>
+      </table>
+      <div style={{fontSize:9,color:RP.muted,marginTop:4}}>Each test changes one assumption and holds the rest.{cm.stress.some(t=>t.cfAtTerm)?" * Positive only once the loan is paid off.":""}</div>
+    </div>
+
+    {/* PAGE 3 — annual projection and notes */}
+    <div style={{breakBefore:"page"}}>
+      <H2 first>Annual projection</H2>
+      <div style={{fontSize:9.5,color:RP.body,marginBottom:6}}>US dollars; negatives in parentheses. Flows are annual totals by rental year; balances and values are at year end. Year 0 is {rep.buildMonths>0?"the "+rep.buildMonths+"-month construction period":"the start, when the down payment is made"}{cm.conPaid>0?"; its loan payments are interest on construction draws":""}.</div>
+      <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <thead><tr>{cols.map((h,i)=><th key={h} style={{...th,textAlign:i?"right":"left"}}>{h}</th>)}</tr></thead>
+        <tbody>
+          {cm.annual.map(a=>(<tr key={a.year} style={{borderBottom:"1px solid "+RP.faint,background:rep.loanAmt>0&&a.year===rep.term?RP.band:"transparent"}}>
+            <td style={{...td,textAlign:"left",fontWeight:600}}>{a.year===0?(rep.buildMonths>0?"0 (build)":"0 (start)"):a.year}</td>
+            <td style={td}>{a.year===0?"—":fAcct(a.rent)}</td>
+            <td style={td}>{a.year===0?"—":fAcct(-a.ops)}</td>
+            <td style={td}>{fAcct(-a.pay)}</td>
+            {showTax&&<td style={td}>{fAcct(-a.tax)}</td>}
+            <td style={{...td,fontWeight:600,color:a.net<0?RP.neg:RP.ink}}>{fAcct(a.net)}</td>
+            <td style={{...td,color:a.cum<0?RP.neg:RP.ink}}>{fAcct(a.cum)}</td>
+            <td style={td}>{fAcct(a.bal)}</td>
+            <td style={td}>{fAcct(a.value)}</td>
+            <td style={{...td,fontWeight:600}}>{fAcct(a.tot)}</td>
+          </tr>))}
+          <tr style={{borderTop:"1.5px solid "+RP.ink}}>
+            <td style={{...td,textAlign:"left",fontWeight:700}}>Total</td>
+            <td style={{...td,fontWeight:700}}>{fAcct(tot.rent)}</td>
+            <td style={{...td,fontWeight:700}}>{fAcct(-tot.ops)}</td>
+            <td style={{...td,fontWeight:700}}>{fAcct(-(tot.pay+cm.annual[0].pay))}</td>
+            {showTax&&<td style={{...td,fontWeight:700}}>{fAcct(-tot.tax)}</td>}
+            <td style={{...td,fontWeight:700}}>{fAcct(tot.net+cm.annual[0].net)}</td>
+            <td colSpan={4}/>
+          </tr>
+        </tbody>
+      </table>
+      {rep.loanAmt>0&&<div style={{fontSize:9,color:RP.muted,marginTop:4}}>Shaded row: final year of the {rep.term}-year loan.</div>}
+
+      <H2>Notes and method</H2>
+      <ul style={{margin:"4px 0 0",paddingLeft:16,fontSize:9.5,color:RP.body,lineHeight:1.55}}>
+        {rep.notes.map((n,i)=><li key={i} style={{marginBottom:3}}>{n}</li>)}
+      </ul>
+      <div style={{marginTop:14,padding:"8px 10px",border:"1px solid "+RP.rule,borderRadius:4,fontSize:8.5,color:RP.muted,lineHeight:1.5}}>
+        This analysis is an estimate for planning purposes only. It is not an appraisal, tax advice, or an offer or commitment to lend. Actual costs, rents, financing terms, taxes and property values will differ. Consult a licensed contractor, lender, appraiser and tax professional before committing funds.
+      </div>
+    </div>
+  </div>);
+}
+
 // Consumer-view card with a years slider and quick presets (loan term, or evaluation horizon when all-cash).
 function YearsCard({title,value,onChange,min,max,presets,unit,aria,note}){
-  return(<div className="pcard" style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
+  return(<div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,gap:8}}>
       <span style={{fontSize:12,color:LT.body}}>{title}</span>
       <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text,whiteSpace:"nowrap"}}>{value}{unit}</span>
@@ -372,36 +547,11 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
 
   return(<>
-    {/* Header */}
-    <div style={{marginBottom:28,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}>
-      <div>
-      <h1 style={{fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,letterSpacing:"-0.02em",color:LT.text,margin:"0 0 6px"}}>Your ADU Investment Summary</h1>
-      <p style={{fontSize:14,color:LT.body,margin:0,lineHeight:1.5}}>{sqft} sq ft {utype.toLowerCase()} · {fD(total)} project · {loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash"}</p>
-      <p className="print-only" style={{fontSize:12,color:LT.muted,margin:"6px 0 0"}}>{customName?customName+" · ":""}Prepared {new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})} · estimates only</p>
-      </div>
-      <div className="no-print" style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap"}}>
-        <button onClick={()=>window.print()} style={{background:LT.card,border:"1px solid "+LT.border,borderRadius:8,color:LT.body,fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>Print / Save as PDF</button>
-        <button onClick={copyShare} style={{background:copied?LT.posBg:LT.info,border:"1px solid "+(copied?LT.pos:LT.info),borderRadius:8,color:copied?LT.pos:"#fff",fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>{copied?"Model link copied ✓":"Copy model link"}</button>
-      </div>
-    </div>
-
-    {/* PRINT: the scenario as plain values in place of the input cards below */}
-    <div className="pcard print-only" style={{...ltCard,padding:"14px 22px",marginBottom:20}}>
-      <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:8}}>Your scenario</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"8px 16px",fontSize:12.5,color:LT.body}}>
-        {[
-          [isSTR?"Expected revenue":"Monthly rent",(hasCustom||isSTR)?fD(rentY1)+"/mo":"Not entered"],
-          ["Down payment",cashDown===100?"All cash ("+fD(total)+")":cashDown===0?"$0 (100% financed)":fD(cashDownAmt)+" ("+cashDown+"%)"],
-          ...(loanAmt>0?[["Loan",fD(loanAmt)+" at "+rate.toFixed(1)+"% for "+term+" yr"],["Monthly payment",fD(loanPmt)]]:[["Evaluated over",horizon+" years"]]),
-          ["Construction",buildMonths>0?buildMonths+" months":"Already built"],
-          ...(cm&&cm.conPaid+cm.conCap>0?[["Construction interest",fD(cm.conPaid+cm.conCap)+(cm.conCap>0?" (added to loan)":" (paid during build)")]]:[]),
-        ].map(([k,v])=><div key={k}><div style={{fontSize:11,color:LT.muted}}>{k}</div><div style={{fontFamily:"'Fraunces',serif",fontSize:15,fontWeight:600,color:LT.text}}>{v}</div></div>)}
-      </div>
-    </div>
-
-    <div className="no-print">
+    <PageHeader title="Your ADU Investment Summary" copied={copied} onCopy={copyShare}
+      subtitle={sqft+" sq ft "+utype.toLowerCase()+" · "+fD(total)+" project · "+(loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash")}/>
+        <div>
     {/* RENT YOU'D CHARGE — same state as the Full model */}
-    <div className="pcard" style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+(isSTR?"#94a3b8":LT.info),opacity:isSTR?0.5:1,pointerEvents:isSTR?"none":"auto"}}>
+    <div style={{...ltCard,padding:"18px 22px",marginBottom:20,borderLeft:"3px solid "+(isSTR?"#94a3b8":LT.info),opacity:isSTR?0.5:1,pointerEvents:isSTR?"none":"auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,gap:12,flexWrap:"wrap"}}>
         <h3 style={{margin:0,fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,fontFamily:"inherit"}}>What would you charge for rent?</h3>
         {isSTR&&<span style={{fontSize:11,color:LT.warn}}>Not applicable in STR mode — rent is driven by your nightly rate</span>}
@@ -428,7 +578,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* DOWN PAYMENT SLIDER — consumer-facing, syncs with internal */}
-    <div className="pcard" style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"18px 22px",marginBottom:20}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
         <span style={{fontSize:12,color:LT.body}}>How much do you want to put down?</span>
         <span style={{fontFamily:"'Fraunces',serif",fontSize:18,fontWeight:600,color:LT.text}}>{cashDown===0?"$0 down":cashDown===100?"All cash ("+fD(total)+")":fD(cashDownAmt)+" ("+cashDown+"%)"}</span>
@@ -451,7 +601,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
 
     {loanAmt>0?(<>
     {/* INTEREST RATE — read-only here; only adjustable in the Full model */}
-    <div className="pcard" style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+    <div style={{...ltCard,padding:"16px 22px",marginBottom:20,background:LT.borderLight,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
       <div>
         <div style={{fontSize:12,color:LT.body,marginBottom:2}}>Interest rate on your loan</div>
         <div style={{fontSize:11,color:LT.muted}}>Fixed for this estimate — adjustable in the Full model.</div>
@@ -470,7 +620,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {!hasCustom&&!isSTR&&(
-      <div className="pcard" style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
+      <div style={{...ltCard,padding:"48px 30px",textAlign:"center",marginBottom:20,background:LT.borderLight}}>
         <div style={{fontSize:36,marginBottom:12}}>↑</div>
         <div style={{fontSize:17,fontWeight:600,color:LT.text,marginBottom:8}}>Enter your estimated rent to see the analysis</div>
         <div style={{fontSize:13,color:LT.body,lineHeight:1.6,maxWidth:420,margin:"0 auto"}}>The full breakdown — monthly cash flow, equity buildup, payback period, and stress tests — appears once you provide a rent estimate for your specific area. Even a rough number works; you can refine it later.</div>
@@ -485,7 +635,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     const secH={fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600};
     return(<>
     {/* HERO outcome card */}
-    <div className="pcard" style={{...ltCard,padding:"28px 30px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"28px 30px",marginBottom:20}}>
       <div style={{...secH,marginBottom:14}}>Estimated total return</div>
       <div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap"}}>
         {cm.hero.map(h=>{const up=h.ret>=0;return(
@@ -501,7 +651,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* MONTHLY BREAKDOWN — rental-year slider */}
-    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6,gap:8,flexWrap:"wrap"}}>
         <div style={secH}>Monthly breakdown</div>
         <span style={{fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:600,color:LT.text}}>Rental year {Math.min(barYear,cm.bars.length)}{loanAmt>0&&barYear>term?" (post-loan)":""}</span>
@@ -594,7 +744,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* PROPERTY VALUE */}
-    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:14}}>Impact on your property value</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:16,marginBottom:16}}>
         <div style={{textAlign:"center",padding:"14px 10px",borderRadius:10,background:LT.borderLight}}>
@@ -620,7 +770,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* CASH POSITION TIMELINE */}
-    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:4}}>Your cash position over time</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Every dollar in and out of your pocket: {cashDownAmt>0?"the "+fD(cashDownAmt)+" down payment, then ":""}each month's rent after expenses, minus loan payments{taxNote}. Payback is where the line crosses zero.</div>
       <TimeChart pts={cm.pts} ariaLabel="Cumulative cash position by year"
@@ -639,7 +789,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* NET EQUITY POSITION */}
-    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:4}}>Net equity position over time</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Total wealth created by the ADU at any point — asset value <strong style={{color:LT.info}}>minus</strong> remaining loan balance <strong style={{color:LT.info}}>plus</strong> your cash position. After the loan is paid off, the payment becomes income and growth accelerates.</div>
       <TimeChart pts={cm.pts} height={250} ariaLabel="Net equity, ADU value, loan balance and cash position by year"
@@ -665,7 +815,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* LIFE AFTER THE LOAN */}
-    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20,background:post.net>=0?"linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)":LT.warnBg,border:"1px solid "+(post.net>=0?"#bbf7d0":"#fde68a")}}>
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20,background:post.net>=0?"linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)":LT.warnBg,border:"1px solid "+(post.net>=0?"#bbf7d0":"#fde68a")}}>
       <div style={{fontSize:11,color:post.net>=0?LT.pos:LT.warn,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:10}}>{loanAmt>0?"Life after the loan — rental year "+(term+1)+" onward":"Income in rental year "+cm.evalYrs}</div>
       <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap",marginBottom:10}}>
         <div style={{fontFamily:"'Fraunces',serif",fontSize:38,fontWeight:700,color:post.net>=0?LT.pos:LT.warn,lineHeight:1}}>{fD(post.net)}/mo</div>
@@ -677,7 +827,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* THE FULL PICTURE — what you put in, what you got, what you keep */}
-    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:14}}>{loanAmt>0?"The full picture when the loan is paid off":"The full picture after "+cm.evalYrs+" years"}</div>
       <div style={{display:"flex",flexDirection:"column",gap:0}}>
         {[
@@ -710,7 +860,7 @@ function ConsumerView({cm,rentY1,total,loanPmt,loanAmt,cashDownAmt,rate,term,set
     </div>
 
     {/* STRESS TESTS */}
-    <div className="pcard" style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
+    <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:6}}>Stress tests</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14}}>How one thing going wrong would change your timeline and your return:</div>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
@@ -886,8 +1036,12 @@ function App(){
       pts.sort((a,b)=>a.year-b.year||(a.hidden?-1:1));
     }
     const bars=[];for(let y=1;y<=evalYrs+(isCash?0:3);y++)bars.push(M0.year(y));
+    // Annual projection: year 0 is the build (down payment, construction interest); then rental years.
+    const s0=M0.at(buildMonths);
+    const annual=[{year:0,rent:0,ops:0,pay:M0.conPaid,tax:0,net:s0.cash,cum:s0.cash,bal:s0.bal,value:s0.value,tot:s0.tot}];
+    bars.forEach((b,i)=>{const s=M0.at(buildMonths+12*(i+1));annual.push({year:i+1,rent:b.rent*12,ops:(b.opEx+b.propTax+b.ins)*12,pay:b.pmt*12,tax:b.incomeTax*12,net:b.net*12,cum:s.cash,bal:s.bal,value:s.value,tot:s.tot})});
     return{
-      pts,bars,isCash,evalYrs,postLoan:M0.year(isCash?evalYrs:term+1),loanEndYr:M0.loanEnd/12,
+      pts,bars,annual,isCash,evalYrs,postLoan:M0.year(isCash?evalYrs:term+1),loanEndYr:M0.loanEnd/12,
       hero:[10,15,20].map(Y=>{const s=M0.at(Y*12);return{yrs:Y,ret:s.tot,roi:annualized(s.tot,total,Y)}}),
       cfPlus:M0.cfPlus,cfAtTerm:M0.cfAtTerm,po:M0.po,
       valueY1:ltrRent*110,valueEnd:end.value,subsidies:M0.subsidies,
@@ -910,9 +1064,64 @@ function App(){
   };
   const dark=view!=="consumer";
 
-  return(
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:view==="consumer"?"#f8fafc":"#0d1117",color:view==="consumer"?"#0f172a":"#e6edf3",minHeight:"100vh",padding:"28px 16px",transition:"background 0.2s"}}>
-      <div style={{maxWidth:view==="internal"?1240:960,margin:"0 auto"}}>
+  // Data for the printed report (both views print the same report).
+  const pct=v=>(Math.round(v*10)/10).toString();
+  const y1=cm.bars[0];
+  const rep=(hasCustom||isSTR)?(()=>{
+    const unit=sqft+" sq ft "+utype.toLowerCase()+" ADU";
+    const strategy=isSTR?"short-term rental at $"+strADR+"/night":isHybrid?"seasonal hybrid ("+strMonths+" months short-term at $"+strADR+"/night)":"long-term lease";
+    const horizonTxt=loanAmt>0?"by loan payoff":"by year "+evalYrs;
+    const parts=[
+      y1.net>=0?"nets about "+fD(y1.net)+"/mo in its first rental year":"needs about "+fD(-y1.net)+"/mo of support in its first rental year",
+      ...(M0.cfPlus>0&&M0.cfPlus!==Infinity?["turns cash-flow positive in year "+M0.cfPlus.toFixed(1)+(M0.cfAtTerm?" (once the loan is paid off)":"")]:M0.cfPlus===Infinity?["does not become cash-flow positive"]:[]),
+      M0.po===0?"never leaves you out of pocket":M0.po===Infinity?"does not pay back what was invested within 50 years":"pays back everything invested by year "+M0.po.toFixed(1),
+      "builds an estimated "+fShort(ret)+" of net equity "+horizonTxt+(roi===null?"":" ("+roi.toFixed(1)+"%/yr compound on cost)"),
+    ];
+    const verdict="At "+fD(grossY1)+"/mo "+(isSTR?"in projected revenue":"rent")+", this "+fD(total)+" project "+parts.slice(0,-1).join(", ")+", and "+parts[parts.length-1]+".";
+    return{
+      cm,title:customName||unit,
+      subtitle:(customName?unit+" · ":"")+strategy[0].toUpperCase()+strategy.slice(1)+" · "+fD(grossY1)+"/mo "+(isSTR?"projected revenue":"rent")+" in year 1",
+      date:new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"}),
+      total,loanAmt,cashDownAmt,cashDown,loanPmt,rate,term,evalYrs,incomeTax,buildMonths,verdict,
+      costRows:[
+        ["Structure ("+sqft+" sq ft × $"+cpsf+")",buildCost],
+        ["Site work",siteCost],
+        ["Permits, utility fees, design & surveys",permits+hookup+design+surveys],
+        ...(furnishing>0?[["Furnishing",furnishing]]:[]),
+        ["Contingency ("+contingency+"% of hard costs)",contingencyAmt],
+        ["Builder / GC margin ("+markup+"%)",markupAmt],
+        ...(origFeeAmt>0?[["Loan origination fee ("+origFee+"%)",origFeeAmt]]:[]),
+      ],
+      finRows:[
+        ["Down payment",cashDown===100?"All cash":fD(cashDownAmt)+" ("+cashDown+"%)"],
+        ...(loanAmt>0?[["Loan amount",fD(loanAmt)],["Rate and term",pct(rate)+"% fixed · "+term+" years"],["Monthly payment",fD(loanPmt)]]:[["Evaluation horizon",horizon+" years"]]),
+        ["Construction period",buildMonths>0?buildMonths+" months":"None (already built)"],
+        ...(loanAmt>0&&buildMonths>0?[["Construction interest",conIntMode==="none"?"Not charged":fD(M0.conInterest)+(conIntMode==="paid"?", paid monthly":", added to loan")+(conPremium>0?" (+"+conPremium+"% rate)":"")]]:[]),
+      ],
+      opRows:[
+        ["Rental strategy",isSTR?"Short-term":isHybrid?"Hybrid · "+strMonths+" mo STR":"Long-term"],
+        ["Rent growth",pct(effG*100)+"%/yr"],
+        ["Vacancy",pct(vacPct*100)+"% of gross"],
+        ["Maintenance & management"+(hasSTR?" & hosting":""),pct(opPct*100)+"% of collected"],
+        ["Property tax",pct(taxRate)+"% of cost · +"+pct(taxGrowth)+"%/yr"],
+        ["Insurance",pct(insurance)+"% of cost · +"+pct(insGrowth)+"%/yr"],
+        ["Income tax",incomeTax>0?incomeTax+"% marginal rate":"Not modeled"],
+        ["Value multiplier","110× monthly long-term rent"],
+      ],
+      notes:[
+        "Rent is the figure entered. The ADU's value is estimated at 110× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
+        "The model runs month by month from project start."+(buildMonths>0?" During the "+buildMonths+"-month build there is no rent; funds are drawn on a standard construction schedule (soft costs up front, owner cash first, hard costs on an S-curve with 5% retention)"+(loanAmt>0?(conIntMode==="none"?". Construction interest is not charged in this scenario.":", with interest on the drawn balance."):"."):""),
+        "Operating costs are vacancy, maintenance, management"+(hasSTR?", hosting":"")+", property tax and insurance, each escalating at the rates shown.",
+        incomeTax>0?"Income tax is applied at "+incomeTax+"% to rental income after "+(loanAmt>0?"loan interest and ":"")+"27.5-year depreciation of "+fD(depBasis)+" (furnishings excluded; construction interest capitalized). Passive-loss limits and depreciation recapture are not modeled.":"Income tax is not modeled; figures are pre-tax.",
+        "Payback is when cumulative cash — down payment, construction interest and monthly cash flow — returns to zero. Annual returns are compound rates on the total project cost.",
+        "Not included: solar (required on new California homes), landscaping restoration, HOA fees, refinancing, or the costs of selling.",
+      ],
+    };
+  })():null;
+
+  return(<>
+    <div className="screen-only" style={{fontFamily:"'DM Sans',sans-serif",background:view==="consumer"?"#f8fafc":"#0d1117",color:view==="consumer"?"#0f172a":"#e6edf3",minHeight:"100vh",padding:"28px 16px",transition:"background 0.2s"}}>
+      <div style={{maxWidth:1120,margin:"0 auto"}}>
         {/* VIEW SWITCHER — always visible; the primary choice on this page */}
         <div className="no-print" role="tablist" aria-label="View mode" style={{display:"flex",gap:6,marginBottom:22,padding:5,borderRadius:14,border:"1px solid "+(dark?"#30363d":"#cbd5e1"),background:dark?"#0d1117":"#eef2f7"}}>
           <button type="button" role="tab" aria-selected={view==="internal"} onClick={()=>set("view")("internal")} style={{flex:1,padding:"12px 8px",borderRadius:10,cursor:"pointer",userSelect:"none",border:"none",fontFamily:"inherit",transition:"background 0.15s",background:view==="internal"?tb:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
@@ -926,7 +1135,7 @@ function App(){
         </div>
 
       {view==="internal"&&(<>
-        <div style={{marginBottom:26,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}><div><h1 style={{fontFamily:"'Fraunces',serif",fontSize:26,fontWeight:700,margin:"0 0 5px",letterSpacing:"-0.02em",color:"#e6edf3"}}>Can ADU Rent Cover the Loan?</h1><p style={{color:"#8b949e",fontSize:13,margin:0,lineHeight:1.5}}>Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan.</p></div><div style={{display:"flex",gap:8,flexShrink:0,marginTop:4}}><button onClick={copyShare} style={{background:copied?"rgba(63,185,80,0.15)":tb,border:"1px solid "+(copied?gn:tb),borderRadius:8,color:copied?gn:"#0d1117",fontSize:13,fontWeight:600,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap",transition:"background 0.15s"}} onMouseEnter={e=>{if(!copied)e.target.style.background="#79b8ff"}} onMouseLeave={e=>{if(!copied)e.target.style.background=tb}}>{copied?"Model link copied ✓":"Copy model link"}</button><button onClick={onResetClick} style={{background:confirmReset?"rgba(248,81,73,0.15)":"transparent",border:"1px solid "+(confirmReset?rd:"#30363d"),borderRadius:6,color:confirmReset?rd:"#8b949e",fontWeight:confirmReset?600:400,fontSize:11,padding:"5px 10px",cursor:"pointer",whiteSpace:"nowrap"}} onMouseEnter={e=>{if(!confirmReset){e.target.style.borderColor=tb;e.target.style.color=tb}}} onMouseLeave={e=>{if(!confirmReset){e.target.style.borderColor="#30363d";e.target.style.color="#8b949e"}}}>{confirmReset?"Click again to confirm":"Reset all"}</button></div></div>
+        <PageHeader dark title="Can ADU Rent Cover the Loan?" subtitle="Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan." copied={copied} onCopy={copyShare} onReset={onResetClick} confirmReset={confirmReset}/>
 
         {/* STICKY MINI SUMMARY — narrow screens only; wide screens have the sticky results column */}
         <div className="no-print mini-bar" style={{position:"sticky",top:0,zIndex:45,background:"#0d1117",border:"1px solid #21262d",borderRadius:8,padding:"10px 16px",marginBottom:16,display:"flex",gap:20,flexWrap:"wrap",alignItems:"baseline",boxShadow:"0 6px 16px rgba(0,0,0,0.35)"}}>
@@ -1180,7 +1389,8 @@ function App(){
 
       </div>
     </div>
-  );
+    <PrintReport rep={rep}/>
+  </>);
 }
 
 

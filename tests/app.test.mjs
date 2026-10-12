@@ -26,11 +26,12 @@ async function load(qs = "", { stored, clipboard, execCommand } = {}) {
   const w = dom.window, doc = w.document;
   return {
     w, doc, errors,
-    // Visible text only (the inline bundle lives outside #root).
-    text: () => doc.getElementById("root").textContent,
+    // On-screen text only (the print report and the inline bundle are excluded).
+    text: () => doc.querySelector("#root .screen-only").textContent,
+    report: () => doc.querySelector("#root .print-report"),
     click: label => { const b = [...doc.querySelectorAll("button")].find(b => b.textContent.includes(label)); assert.ok(b, "button " + label); b.click(); return wait(60); },
     // Text of the value element that follows a card label.
-    card: label => { const el = [...doc.querySelectorAll("div")].find(e => e.textContent === label); return el?.nextElementSibling?.textContent ?? null; },
+    card: label => { const el = [...doc.querySelectorAll("#root .screen-only div")].find(e => e.textContent === label); return el?.nextElementSibling?.textContent ?? null; },
     saved: () => JSON.parse(w.localStorage.getItem(SK) || "null"),
     type: async (sel, value) => {
       const el = doc.querySelector(sel);
@@ -234,25 +235,66 @@ describe("Full model layout", () => {
   });
 });
 
-describe("printout", () => {
-  test("inputs are screen-only; a static scenario card and date are print-only", async () => {
-    const { doc } = await load("?customRent=2600&cashDown=20&view=consumer");
-    for (const r of doc.querySelectorAll("#root input")) assert.ok(r.closest(".no-print"), "input hidden in print: " + (r.id || r.getAttribute("aria-label")));
-    const printed = [...doc.querySelectorAll(".print-only")].map(e => e.textContent).join(" ");
-    assert.match(printed, /Your scenario.*\$2,600\/mo.*\$52,330 \(20%\).*7\.5% for 10 yr/);
-    assert.match(printed, /Prepared .*estimates only/);
-  });
-  test("charts scale to the page instead of clipping", async () => {
-    const { doc } = await load("?customRent=2600&view=consumer");
-    for (const svg of doc.querySelectorAll("svg[role=img]")) {
-      assert.ok(svg.getAttribute("viewBox"));
-      assert.equal(svg.style.width, "100%");
+describe("header actions", () => {
+  test("Copy model link is the rightmost header button in both views", async () => {
+    for (const view of ["internal", "consumer"]) {
+      const { doc } = await load("?customRent=2600&view=" + view);
+      const h1 = doc.querySelector(".screen-only h1");
+      const buttons = [...h1.parentElement.parentElement.querySelectorAll("button")].map(b => b.textContent);
+      assert.equal(buttons.at(-1), "Copy model link", view);
+      assert.equal(buttons.at(-2), "Print / Save as PDF", view);
     }
   });
 });
 
+describe("printed report", () => {
+  const rows = (table) => [...table.querySelectorAll("tbody tr")].map(tr => [...tr.children].map(td => td.textContent));
+  const acct = v => v === "—" ? 0 : (v.startsWith("(") ? -1 : 1) * Number(v.replace(/[(),]/g, ""));
+  test("is separate from the screen UI and identical from either view", async () => {
+    const a = (await load("?customRent=2600&cashDown=20&customName=Smith%20ADU")).report();
+    const b = (await load("?customRent=2600&cashDown=20&customName=Smith%20ADU&view=consumer")).report();
+    assert.ok(a && !a.closest(".screen-only"));
+    assert.equal(a.textContent.replace(/Prepared [^E]+/, ""), b.textContent.replace(/Prepared [^E]+/, ""));
+    assert.match(a.textContent, /ADU Investment Analysis.*Smith ADU.*Prepared/);
+  });
+  test("leads with a verdict and key figures that match the screen", async () => {
+    const p = await load("?customRent=2600&cashDown=20&view=consumer");
+    const t = p.report().textContent;
+    assert.match(t, /At \$2,600\/mo rent, this \$261,650 project needs about \$\d[\d,]*\/mo of support in its first rental year, turns cash-flow positive in year [\d.]+, pays back everything invested by year [\d.]+, and builds an estimated/);
+    assert.ok(t.includes(p.card("Payback period")), "payback matches");
+  });
+  test("cost table adds up to the total", async () => {
+    const r = (await load("?customRent=2600&furnishing=5000&origFeeOn=1")).report();
+    const cost = rows(r.querySelector("table"));
+    const items = cost.slice(0, -1).reduce((s, [, v]) => s + money(v), 0);
+    assert.equal(cost.at(-1)[0], "Total project cost");
+    assert.equal(items, money(cost.at(-1)[1]));
+  });
+  test("annual projection reconciles: net flows sum to final cumulative cash", async () => {
+    const r = (await load("?customRent=2600&cashDown=20&incomeTax=24")).report();
+    const table = [...r.querySelectorAll("table")].at(-1);
+    const head = [...table.querySelectorAll("th")].map(th => th.textContent);
+    const body = rows(table), data = body.slice(0, -1), total = body.at(-1);
+    const iNet = head.indexOf("Net cash flow"), iCum = head.indexOf("Cumulative cash");
+    assert.ok(head.includes("Income tax"));
+    const sum = data.reduce((s, row) => s + acct(row[iNet]), 0);
+    assert.ok(Math.abs(sum - acct(data.at(-1)[iCum])) <= data.length, sum + " vs " + data.at(-1)[iCum]);
+    assert.ok(Math.abs(acct(total[iNet]) - sum) <= data.length);
+    assert.doesNotMatch(table.textContent, /-0\b|NaN|undefined/);
+  });
+  test("charts scale to the page instead of clipping", async () => {
+    const r = (await load("?customRent=2600")).report();
+    const svgs = r.querySelectorAll("svg[role=img]");
+    assert.equal(svgs.length, 2);
+    for (const svg of svgs) { assert.ok(svg.getAttribute("viewBox")); assert.equal(svg.style.width, "100%"); }
+  });
+  test("asks for a rent when there isn't one", async () => {
+    assert.match((await load("?sqft=600")).report().textContent, /Enter the rent/);
+  });
+});
+
 describe("stress tests", () => {
-  const rows = p => [...p.doc.querySelectorAll("table tbody tr")].map(tr => {
+  const rows = p => [...p.doc.querySelectorAll(".screen-only table tbody tr")].map(tr => {
     const td = [...tr.querySelectorAll("td")];
     return { label: td[0].textContent, payback: parseFloat(td[2].textContent), ret: money(td[3].firstChild.textContent) * (/k$/.test(td[3].firstChild.textContent) ? 1000 : 1) };
   });
@@ -286,7 +328,7 @@ describe("all-cash consumer view", () => {
 describe("charts", () => {
   test("completion shows as a step with its own hover point", async () => {
     const p = await load("?customRent=2600&cashDown=20&view=consumer");
-    const svgs = p.doc.querySelectorAll("svg[role=img]");
+    const svgs = p.doc.querySelectorAll(".screen-only svg[role=img]");
     assert.equal(svgs.length, 2);
     // Hover each target on the net-equity chart until the completion point's tooltip appears.
     const targets = [...svgs[1].querySelectorAll("rect[fill=transparent]")];
