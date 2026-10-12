@@ -352,6 +352,47 @@ describe("site facts", () => {
   });
 });
 
+describe("budget confidence", () => {
+  const panel = t => {
+    const m = t.match(/Quoted or known(\d+)%of the budgetLine-item uncertainty±(\$[\d,]+)likely spread of the totalSuggested contingency(\d+)%of hard costs · you have (\d+)%/);
+    return m && { firmed: +m[1], spread: money(m[2]), suggested: +m[3], have: +m[4] };
+  };
+  test("is off by default", async () => {
+    const t = (await load("?customRent=2600")).text();
+    assert.match(t, /Track how firm each cost is/);
+    assert.equal(panel(t), null);
+  });
+  test("all estimates: 0% firm, 15% suggested, spread is the root-sum-square of ±25% lines", async () => {
+    const p = await load("?customRent=2600&firmOn=1");
+    const b = panel(p.text());
+    const lines = [180000, 10000, 8000, 8000, 3000, 2000, 10000, 8000, 8000, 3500];
+    const rss = Math.sqrt(lines.reduce((s, x) => s + (x * 1.2 * 0.25) ** 2, 0));
+    assert.equal(b.firmed, 0);
+    assert.equal(b.suggested, 15);
+    assert.ok(Math.abs(b.spread - rss) <= 1, b.spread + " vs " + rss);
+  });
+  test("quotes and known prices firm up the budget and lower the suggestion", async () => {
+    assert.deepEqual((({ firmed, suggested }) => ({ firmed, suggested }))(panel((await load("?customRent=2600&firmOn=1&firm=qqqqqqqqqqq")).text())), { firmed: 100, suggested: 5 });
+    const k = panel((await load("?customRent=2600&firmOn=1&firm=kkkkkkkkkkk")).text());
+    assert.equal(k.suggested, 0);
+    assert.equal(k.spread, 0);
+  });
+  test("marking a line and applying the suggestion", async () => {
+    const p = await load("?customRent=2600&firmOn=1");
+    const group = p.doc.querySelector("[role=radiogroup][aria-label='Structure firmness']");
+    [...group.querySelectorAll("button")].find(b => b.textContent === "Quote").click(); await wait(60);
+    assert.equal(p.saved().firm, "qeeeeeeeeee");
+    const b = panel(p.text());
+    assert.ok(b.suggested < 15 && b.suggested > 5, "structure is most of the hard costs: " + b.suggested);
+    await p.click("Use " + b.suggested + "% contingency");
+    assert.equal(p.saved().contingency, b.suggested);
+  });
+  test("bad firmness strings in a link are ignored; the report notes it when on", async () => {
+    assert.equal((await load("?customRent=2600&firmOn=1&firm=zz")).saved()?.firm ?? "eeeeeeeeeee", "eeeeeeeeeee");
+    assert.match((await load("?customRent=2600&firmOn=1")).report().textContent, /Budget confidence: 0% of line-item costs are quoted or known/);
+  });
+});
+
 describe("typed values", () => {
   const editor = (p, label) => {
     const lab = [...p.doc.querySelectorAll(".screen-only span[id]")].find(s => s.textContent.startsWith(label));

@@ -176,7 +176,7 @@ const PTYPES={
   attached:mkType("Attached addition","attached ADU","New unit joined to the house",{...F0,access:"open",demo:"small",trenchFt:40},{sqft:600,cpsf:275,hardscape:1000,permits:10000,hookup:6000,design:9000,contingency:8,markup:20,buildMonths:7}),
   jadu:mkType("Junior ADU","junior ADU","Within the house, up to 500 sq ft",{...F0,fdn:"none",soil:"known",trenchFt:0,allElectric:false,boundary:"have"},{sqft:400,cpsf:125,hardscape:0,permits:4000,hookup:0,design:3000,contingency:10,markup:20,buildMonths:3}),
 };
-const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,incomeTax:0,customRent:0,customName:"",view:"internal"};
+const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"facts",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,incomeTax:0,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
@@ -204,6 +204,7 @@ function cleanField(k,raw){
     return l?Math.min(l[1],Math.max(l[0],n)):n;
   }
   if(ENUMS[k])return ENUMS[k].includes(raw)?raw:undefined;
+  if(k==="firm")return typeof raw==="string"&&/^[eqk]{11}$/.test(raw)?raw:undefined;
   return typeof raw==="string"?raw.slice(0,200):undefined;
 }
 function cleanState(src){
@@ -269,6 +270,56 @@ function MethodSwitch({label,value,onChange,options}){
 }
 // The controls governed by a MethodSwitch: indented under a rule in the accent colour.
 const nested={marginTop:10,paddingLeft:14,borderLeft:"2px solid rgba(88,166,255,0.35)"};
+
+// Budget confidence (optional): mark each cost line as an estimate, a quote, or a known price.
+// Typical accuracy: a rough estimate lands within about ±25%, a contractor or city quote within
+// about ±10% (change orders, allowances), a fixed fee or signed fixed price is known. Contingency
+// practice follows the same split: ~15% on unquoted work, ~5% on quoted work, none on fixed prices.
+const FIRM={e:{label:"Estimate",range:0.25,cont:0.15},q:{label:"Quote",range:0.10,cont:0.05},k:{label:"Known",range:0,cont:0}};
+const FIRM_LINES=[["structure","Structure",true],["foundation","Foundation",true],["sitePrep","Grading, demo & access",true],["utilTrench","Utility trenching",true],["electrical","Electrical",true],["hardscape","Hardscape & path",true],
+  ["permits","Permits & inspections",false],["hookup","Water & sewer fees",false],["design","Design & engineering",false],["surveys","Surveys & reports",false],["furnishing","Furnishing",false]];
+const FIRM_DEFAULT="e".repeat(FIRM_LINES.length);
+// amounts: {key: dollars before markup}; firm: one letter per FIRM_LINES entry; markup: % applied to every line.
+function budgetConfidence(amounts,firm,markup){
+  const m=1+markup/100;let total=0,firmed=0,varSum=0,hard=0,hardCont=0;
+  const lines=FIRM_LINES.map(([k,label,isHard],i)=>{
+    const st=FIRM[firm[i]]?firm[i]:"e",amt=amounts[k]||0,withM=amt*m;
+    total+=withM;if(st!=="e")firmed+=withM;varSum+=Math.pow(withM*FIRM[st].range,2);
+    if(isHard){hard+=amt;hardCont+=amt*FIRM[st].cont}
+    return{k,label,i,st,amt};
+  });
+  return{lines,firmedPct:total>0?firmed/total*100:0,spread:Math.sqrt(varSum),suggested:hard>0?Math.round(hardCont/hard*100):0};
+}
+function BudgetConfidence({on,onToggle,firm,setFirm,bc,contingency,setContingency}){
+  const setLine=(i,st)=>setFirm(firm.slice(0,i)+st+firm.slice(i+1));
+  return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+    <Tog on={on} onToggle={onToggle} label="Track how firm each cost is" sub="Mark each line as an estimate, a quote or a known price to see how solid the budget is and what contingency it needs"/>
+    {on&&(<div style={nested}>
+      <div role="table" aria-label="Budget confidence by line" style={{display:"flex",flexDirection:"column"}}>
+        {bc.lines.filter(l=>l.amt>0).map(l=>(
+          <div role="row" key={l.k} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid #21262d",flexWrap:"wrap"}}>
+            <span role="cell" style={{flex:"1 1 150px",fontSize:12.5,color:"#c9d1d9"}}>{l.label}</span>
+            <span role="cell" style={{fontFamily:"'Fraunces',serif",fontSize:14,fontWeight:600,color:"#e6edf3",minWidth:80,textAlign:"right"}}>{fD(l.amt)}</span>
+            <span role="cell"><span role="radiogroup" aria-label={l.label+" firmness"} style={{display:"inline-flex",border:"1px solid #30363d",borderRadius:6,overflow:"hidden"}}>
+              {Object.entries(FIRM).map(([st,f])=>{const sel=l.st===st;return(
+                <button key={st} type="button" role="radio" aria-checked={sel} onClick={()=>setLine(l.i,st)} style={{padding:"4px 9px",fontSize:11,fontFamily:"inherit",cursor:"pointer",border:"none",borderRight:st!=="k"?"1px solid #30363d":"none",background:sel?(st==="e"?"rgba(210,153,34,0.18)":st==="q"?"rgba(88,166,255,0.18)":"rgba(63,185,80,0.18)"):"transparent",color:sel?(st==="e"?yl:st==="q"?tb:gn):"#8b949e",fontWeight:sel?600:400}}>{f.label}</button>)})}
+            </span></span>
+          </div>))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginTop:12}}>
+        {[["Quoted or known",Math.round(bc.firmedPct)+"%","of the budget"],["Line-item uncertainty","±"+fD(bc.spread),"likely spread of the total"],["Suggested contingency",bc.suggested+"%","of hard costs · you have "+contingency+"%"]].map(([k,v,s])=>(
+          <div key={k} style={{...card,background:"#0d1117",padding:"10px 12px"}}>
+            <div style={{fontSize:10.5,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{k}</div>
+            <div style={{fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:600,color:"#e6edf3",marginTop:2}}>{v}</div>
+            <div style={{fontSize:11,color:"#6e7681"}}>{s}</div>
+          </div>))}
+      </div>
+      {bc.suggested!==contingency&&<button type="button" onClick={()=>setContingency(bc.suggested)} style={{marginTop:10,padding:"7px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",background:"transparent",border:"1px solid "+tb,color:tb}}>Use {bc.suggested}% contingency</button>}
+      <div style={{fontSize:11,color:"#6e7681",marginTop:8,lineHeight:1.45}}>Estimates typically land within ±25%, quotes within ±10%, and known prices don't move. The uncertainty combines lines the way estimators do for independent risks (root-sum-square), so it's smaller than adding every worst case.</div>
+    </div>)}
+  </div>);
+}
+
 
 // One site fact: a label (with optional help) above a row of choices.
 function Fact({label,help,children}){
@@ -1079,7 +1130,7 @@ function App(){
   const pickType=useCallback(t=>{fromShareRef.current=false;setState(s=>({...s,...PTYPES[t].v,...PTYPES[t].f,projectType:t}))},[]);
   // Switching to dollar amounts starts the sliders at what the site facts produced, so nothing jumps.
   const setSiteMode=useCallback(m=>{fromShareRef.current=false;setState(s=>m==="dollars"&&s.siteMode!=="dollars"?{...s,siteMode:m,...siteDollars(siteFromFacts(s,s.sqft))}:{...s,siteMode:m})},[]);
-  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,incomeTax,customRent,customName,view}=state;
+  const{projectType,siteMode,sqft,cpsf,permits,hookup,hardscape,design,contingency,markup,rentalMode,strADR,strGrowth,strCosts,strVacancy,strMonths,furnishing,cashDown,origFeeOn,origFee,rate,term,buildMonths,conIntMode,conPremium,horizon,taxRate,taxGrowth,insurance,insGrowth,maint,vacancy,mgmt,growth,grm,incomeTax,firmOn,firm,customRent,customName,view}=state;
   const isSTR=rentalMode==="str",isHybrid=rentalMode==="hybrid",isLTR=rentalMode==="ltr";
   const ptype=PTYPES[projectType]||PTYPES.detached;
   // Site work: from the site facts, or the dollar sliders when the user prefers to enter amounts.
@@ -1095,6 +1146,7 @@ function App(){
   // Insurance covers rebuilding the dwelling: the structure and its foundation, plus the builder's
   // margin on them. Permits, fees, design, site work and furniture aren't part of dwelling coverage.
   const insBase=Math.round((buildCost+foundation)*(1+markup/100));
+  const bc=budgetConfidence({structure:buildCost,foundation,sitePrep,utilTrench,electrical,hardscape,permits,hookup,design,surveys,furnishing},firm,markup);
   const subtotal=buildCost+siteCost+softCostBase+contingencyAmt,markupAmt=Math.round(markupBase*(markup/100));
   const assetCost=subtotal+markupAmt;
   const origFeeAmt=origFeeOn?Math.round(assetCost*(origFee/100)):0;
@@ -1258,6 +1310,7 @@ function App(){
         ["Value multiplier",grm+"× monthly long-term rent"],
       ],
       notes:[
+        ...(firmOn?["Budget confidence: "+Math.round(bc.firmedPct)+"% of line-item costs are quoted or known; the remaining uncertainty is about ±"+fD(bc.spread)+". Contingency is "+contingency+"% of hard costs"+(bc.suggested!==contingency?" (suggested from firmness: "+bc.suggested+"%)":", as suggested from firmness")+"."]:[]),
         ...(facts?(()=>{const lc=t=>t[0].toLowerCase()+t.slice(1);return["Site work is estimated from site facts — foundation: "+lc(sf.why.foundation)+"; grading and access: "+lc(sf.why.sitePrep)+"; utilities: "+lc(sf.why.utilTrench)+"; electrical: "+lc(sf.why.electrical)+"; surveys: "+lc(sf.why.surveys)+"."]})():[]),
         "Rent is the figure entered. The ADU's value is estimated at "+grm+"× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
         "The model runs month by month from project start."+(buildMonths>0?" During the "+buildMonths+"-month build there is no rent; funds are drawn on a standard construction schedule (soft costs up front, owner cash first, hard costs on an S-curve with 5% retention)"+(loanAmt>0?(conIntMode==="none"?". Construction interest is not charged in this scenario.":", with interest on the drawn balance."):"."):""),
@@ -1335,7 +1388,10 @@ function App(){
           </div>
 
           <SL>Contingency</SL>
-          <TS label={<>Contingency<IT align="left" text={"Percentage of hard costs (structure + site work) set aside for unforeseen items — buried utilities, soil surprises, permit re-inspections, landscaping restoration.\n\n5% is standard for straightforward builds; 10–15% for complex sites or older neighborhoods with unknown infrastructure."}/></>} value={contingency} onChange={set("contingency")} typeMin={LIM.contingency[0]} typeMax={LIM.contingency[1]} min={0} max={20} step={1} format={v=>v===0?"None":v+"% ("+fD(contingencyAmt)+")"} ticks={[{value:0,label:"None",color:gn},{value:5,label:"Typical",color:tb},{value:10,label:"Complex",color:tk},{value:15,label:"High risk",color:yl}]}/>
+          <TS label={<>Contingency<IT align="left" text={"Percentage of hard costs (structure + site work) set aside for unforeseen items — buried utilities, soil surprises, permit re-inspections, landscaping restoration.\n\n5% is standard for straightforward builds; 10–15% for complex sites or older neighborhoods with unknown infrastructure.\n\nTurn on Budget confidence below to get a contingency suggested from how firm each cost is."}/></>} value={contingency} onChange={set("contingency")} typeMin={LIM.contingency[0]} typeMax={LIM.contingency[1]} min={0} max={20} step={1} format={v=>v===0?"None":v+"% ("+fD(contingencyAmt)+")"} ticks={[{value:0,label:"None",color:gn},{value:5,label:"Typical",color:tb},{value:10,label:"Complex",color:tk},{value:15,label:"High risk",color:yl}]}/>
+
+          <SL>Budget confidence</SL>
+          <BudgetConfidence on={firmOn} onToggle={()=>set("firmOn")(!firmOn)} firm={firm} setFirm={set("firm")} bc={bc} contingency={contingency} setContingency={set("contingency")}/>
 
           <SL>Builder / GC margin</SL>
           <TS label={<>Markup on project<IT align="left" text="The general contractor's profit and overhead on top of raw materials and labor — it's how a builder stays in business, covers insurance, permits paperwork, and project management, and absorbs the risk of things going wrong. 0% (owner-builder) means you're acting as your own GC and only paying subcontractors directly."/></>} value={markup} onChange={set("markup")} typeMin={LIM.markup[0]} typeMax={LIM.markup[1]} min={0} max={40} step={1} format={v=>v===0?"Owner-builder":v+"% ("+fD(markupAmt)+")"} ticks={[{value:0,label:"Owner-builder",color:gn},{value:10,label:"Prefab co.",color:tb},{value:20,label:"Typical GC",color:tk},{value:25,label:"Design-build",color:yl},{value:35,label:"Premium",color:rd}]}/>
