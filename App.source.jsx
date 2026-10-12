@@ -256,6 +256,20 @@ function TS({label,value,onChange,min,max,step,format,ticks,badge,typeMin,typeMa
   const on=i===near&&best<6;
   return(<div key={i} style={{position:"absolute",left:`${left}%`,transform:edge,display:"flex",flexDirection:"column",alignItems:align,pointerEvents:"none"}}><div style={{width:1,height:stagger?16:5,background:t.color||"#3d444d",alignSelf:align==="center"?"center":align,opacity:on?1:0.65}}/><span style={{fontSize:9.5,color:on?"#e6edf3":tk,whiteSpace:"nowrap",marginTop:1,fontWeight:on?600:500,transition:"color 0.15s"}}>{t.label}</span></div>)})})()}</div>)}</div>)}
 
+// Chooses HOW a section is estimated. Styled as option cards with a radio dot so it reads as a
+// choice of approach that governs the controls nested beneath it, not as one more answer.
+function MethodSwitch({label,value,onChange,options}){
+  return(<div role="radiogroup" aria-label={label} style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
+    {options.map(o=>{const on=value===o.value;return(
+      <button key={o.value} type="button" role="radio" aria-checked={on} onClick={()=>onChange(o.value)} style={{display:"flex",gap:10,alignItems:"flex-start",textAlign:"left",padding:"10px 12px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",background:on?"rgba(88,166,255,0.10)":"transparent",border:(on?"1.5px solid "+tb:"1px dashed #3d444d"),transition:"border-color 0.15s, background 0.15s"}}>
+        <span aria-hidden="true" style={{flexShrink:0,width:16,height:16,marginTop:1,borderRadius:"50%",border:"2px solid "+(on?tb:"#6e7681"),display:"inline-flex",alignItems:"center",justifyContent:"center"}}>{on&&<span style={{width:8,height:8,borderRadius:"50%",background:tb}}/>}</span>
+        <span><span style={{display:"block",fontSize:13,fontWeight:600,color:on?"#e6edf3":"#c9d1d9"}}>{o.label}</span><span style={{display:"block",fontSize:11,color:"#8b949e",marginTop:2,lineHeight:1.35}}>{o.desc}</span></span>
+      </button>)})}
+  </div>);
+}
+// The controls governed by a MethodSwitch: indented under a rule in the accent colour.
+const nested={marginTop:10,paddingLeft:14,borderLeft:"2px solid rgba(88,166,255,0.35)"};
+
 // One site fact: a label (with optional help) above a row of choices.
 function Fact({label,help,children}){
   return(<div><div style={{fontSize:12,color:"#8b949e",marginBottom:5,display:"flex",alignItems:"center"}}>{label}{help&&<IT align="left" text={help}/>}</div>{children}</div>);
@@ -264,7 +278,7 @@ const opts=pairs=>pairs.map(([value,label])=>({value,label}));
 // The site-facts questionnaire and the dollar amounts it produces, each with the reason.
 function SiteFacts({s,set,sf}){
   const isNew=s.fdn==="new",inside=s.fdn==="none";
-  return(<div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+  return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
     <Fact label="Foundation"><ModePills label="Foundation" value={s.fdn} onChange={set("fdn")} options={opts([["new","New"],["existing","Existing slab"],["none","None (inside house)"]])}/></Fact>
     {isNew&&<Fact label="Lot slope" help={"Gentle: under about 5%. Moderate: 5–15% — usually a raised foundation. Steep: over 15% — an engineered hillside foundation and a full geotechnical report."}>
       <ModePills label="Lot slope" value={s.slope} onChange={set("slope")} options={opts([["flat","Flat"],["gentle","Gentle"],["moderate","Moderate"],["steep","Steep"]])}/></Fact>}
@@ -1306,9 +1320,12 @@ function App(){
           </div>
 
           <SL>Site work</SL>
-          <ModePills label="Site work method" value={siteMode} onChange={setSiteMode} options={[{value:"facts",label:"Estimate from site facts"},{value:"dollars",label:"Enter dollar amounts"}]}/>
+          <div style={{fontSize:12,color:"#8b949e",marginBottom:6}}>How should site work be estimated?</div>
+          <MethodSwitch label="Site work method" value={siteMode} onChange={setSiteMode} options={[
+            {value:"facts",label:"Estimate from site facts",desc:"Answer a few questions about the lot; each cost is calculated with its reason"},
+            {value:"dollars",label:"Enter dollar amounts",desc:"Drag the sliders or type in contractor quotes"}]}/>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {facts?<SiteFacts s={state} set={set} sf={sf}/>:(<div style={{display:"flex",flexDirection:"column",gap:6,marginTop:10}}>
+            {facts?<div style={nested}><SiteFacts s={state} set={set} sf={sf}/></div>:(<div style={{...nested,display:"flex",flexDirection:"column",gap:6}}>
               <TS label={<>Foundation<IT align="left" text="What the structure sits on. Cheapest to priciest: pier/post (posts driven into the ground — common for smaller or elevated units), slab (a poured concrete pad — the typical default), crawl space (a raised foundation with access underneath, needed on uneven lots), and hillside engineering (retaining walls and extra structural work for a sloped site)."/></>} value={foundation} onChange={set("foundation")} typeMin={LIM.foundation[0]} typeMax={LIM.foundation[1]} min={0} max={50000} step={1000} format={v=>v===0?"Existing":fD(v)} ticks={[{value:0,label:"Existing",color:gn},{value:5000,label:"Pier / post",color:gn},{value:10000,label:"Slab",color:tb},{value:18000,label:"Crawl space",color:tk},{value:35000,label:"Hillside eng.",color:rd}]}/>
               <TS label="Grading, demo & access" value={sitePrep} onChange={set("sitePrep")} typeMin={LIM.sitePrep[0]} typeMax={LIM.sitePrep[1]} min={0} max={30000} step={500} format={v=>v===0?"None":fD(v)} ticks={[{value:3000,label:"Flat / clear",color:gn},{value:8000,label:"Average",color:tk},{value:15000,label:"Tight access",color:yl},{value:25000,label:"Complex",color:rd}]}/>
               <TS label="Utility trenching" value={utilTrench} onChange={set("utilTrench")} typeMin={LIM.utilTrench[0]} typeMax={LIM.utilTrench[1]} min={0} max={30000} step={500} format={v=>v===0?"None (existing)":fD(v)} ticks={[{value:3000,label:"Short run",color:gn},{value:8000,label:"Average",color:tk},{value:15000,label:"Long / rocky",color:yl},{value:22000,label:"+sewer pump",color:rd}]}/>
