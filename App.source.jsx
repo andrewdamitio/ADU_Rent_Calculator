@@ -274,9 +274,17 @@ function MoneyInput({value,onChange,lo,hi,label}){
   </span>);
 }
 
-function Sl({label,value,onChange,min,max,step,format,typeMin,typeMax}){const id=useId();return(<div style={{display:"flex",flexDirection:"column",gap:3}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span id={id} style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>{label}</span><EditVal value={value} format={format} onChange={onChange} lo={typeMin??min} hi={typeMax??max} integer={Number.isInteger(step)} style={{fontSize:17,fontFamily:"'Fraunces',serif",fontWeight:600,color:"#e6edf3"}}/></div><input type="range" aria-labelledby={id} aria-valuetext={format(value)} min={min} max={max} step={step} value={value} onChange={e=>onChange(parseFloat(e.target.value))} style={{width:"100%",accentColor:tb,height:5,cursor:"pointer"}}/></div>)}
+// The monthly rent box: updates the model as you type, shows commas when you're done, and stays
+// blank (showing its placeholder) until a rent is entered.
+function RentInput({id,value,onChange,style}){
+  const[txt,setTxt]=useState(null);
+  const parse=t=>{const raw=t.replace(/[$,\s]/g,"").toLowerCase(),k=raw.endsWith("k");const n=parseFloat(k?raw.slice(0,-1):raw)*(k?1000:1);return Number.isFinite(n)?Math.max(0,Math.min(100000,Math.round(n))):0};
+  return(<input id={id} className="fld" type="text" inputMode="numeric" placeholder="e.g. 2,000" style={style}
+    value={txt??(value>0?Math.round(value).toLocaleString():"")}
+    onFocus={()=>setTxt(value>0?String(Math.round(value)):"")} onChange={e=>{setTxt(e.target.value);onChange(parse(e.target.value))}} onBlur={()=>setTxt(null)}/>);
+}
 
-function TS({label,value,onChange,min,max,step,format,ticks,badge,typeMin,typeMax,box}){const id=useId();const pct=v=>((v-min)/(max-min))*100;return(<div style={{display:"flex",flexDirection:"column"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:box?"center":"baseline",marginBottom:box?6:3,gap:8}}><span style={{fontSize:12,color:"#8b949e"}}><span id={id}>{label}</span>{badge&&<span style={{marginLeft:6,fontSize:11,color:tb,background:"rgba(88,166,255,0.1)",padding:"1px 6px",borderRadius:4,fontWeight:600}}>{badge}</span>}</span>{box?<MoneyInput value={value} onChange={onChange} lo={typeMin??min} hi={typeMax??max} label={box}/>:<EditVal value={value} format={format} onChange={onChange} lo={typeMin??min} hi={typeMax??max} integer={Number.isInteger(step)} style={{fontSize:15,fontFamily:"'Fraunces',serif",fontWeight:600,color:"#e6edf3"}}/>}</div><input type="range" aria-labelledby={id} aria-valuetext={String(format(value))} min={min} max={max} step={step} value={value} onChange={e=>onChange(parseFloat(e.target.value))} style={{width:"100%",accentColor:tb,height:5,cursor:"pointer",margin:0}}/>{ticks&&ticks.length>0&&(<div style={{position:"relative",height:30,marginTop:2}}>{(()=>{
+function TS({label,value,onChange,min,max,step,format,ticks,badge,typeMin,typeMax,box}){const id=useId();const pct=v=>((v-min)/(max-min))*100;return(<div style={{display:"flex",flexDirection:"column"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:box?"center":"baseline",marginBottom:box?6:3,gap:8}}><span style={{fontSize:12,color:"#8b949e"}}><span id={id}>{label}</span>{badge&&<span style={{marginLeft:6,fontSize:11,color:tb,background:"rgba(88,166,255,0.1)",padding:"1px 6px",borderRadius:4,fontWeight:600}}>{badge}</span>}</span>{box?<MoneyInput value={value} onChange={onChange} lo={typeMin??min} hi={typeMax??max} label={box}/>:<EditVal value={value} format={format} onChange={onChange} lo={typeMin??min} hi={typeMax??max} integer={Number.isInteger(step)} style={{fontSize:15,fontFamily:"'Fraunces',serif",fontWeight:600,color:"#e6edf3"}}/>}</div><input type="range" aria-labelledby={id} aria-valuetext={String(format(value))} min={min} max={max} step={step} value={value} onChange={e=>onChange(parseFloat(e.target.value))} style={{width:"100%",accentColor:tb,height:5,cursor:"pointer",margin:0}}/>{ticks&&ticks.length>0&&(<div style={{position:"relative",height:36,marginTop:2}}>{(()=>{
   // Which tick is the handle sitting closest to? Only that label gets full contrast.
   let near=-1,best=Infinity;ticks.forEach((t,i)=>{const d=Math.abs(pct(t.value)-pct(value));if(d<best){best=d;near=i}});
   return ticks.map((t,i)=>{const left=pct(t.value);if(left<0||left>100)return null;const stagger=i%2===1;
@@ -284,7 +292,7 @@ function TS({label,value,onChange,min,max,step,format,ticks,badge,typeMin,typeMa
   const edge=left<8?"translateX(0)":left>92?"translateX(-100%)":"translateX(-50%)";
   const align=left<8?"flex-start":left>92?"flex-end":"center";
   const on=i===near&&best<6;
-  return(<div key={i} style={{position:"absolute",left:`${left}%`,transform:edge,display:"flex",flexDirection:"column",alignItems:align,pointerEvents:"none"}}><div style={{width:1,height:stagger?16:5,background:t.color||"#3d444d",alignSelf:align==="center"?"center":align,opacity:on?1:0.65}}/><span style={{fontSize:9.5,color:on?"#e6edf3":tk,whiteSpace:"nowrap",marginTop:1,fontWeight:on?600:500,transition:"color 0.15s"}}>{t.label}</span></div>)})})()}</div>)}</div>)}
+  return(<div key={i} style={{position:"absolute",left:`${left}%`,transform:edge,display:"flex",flexDirection:"column",alignItems:align,pointerEvents:"none"}}><div style={{width:1,height:stagger?20:5,background:t.color||"#3d444d",alignSelf:align==="center"?"center":align,opacity:on?1:0.65}}/><span style={{fontSize:9.5,color:on?"#e6edf3":tk,whiteSpace:"nowrap",marginTop:1,fontWeight:on?600:500,transition:"color 0.15s"}}>{t.label}</span></div>)})})()}</div>)}</div>)}
 
 // Chooses HOW a section is estimated. Styled as option cards with a radio dot so it reads as a
 // choice of approach that governs the controls nested beneath it, not as one more answer.
@@ -426,7 +434,7 @@ function SiteFacts({s,set,sf}){
 function TypePicker({value,onPick,custom}){
   return(<div>
     <div id="ptype-label" style={{fontSize:12,color:"#8b949e",marginBottom:6}}>What are you building?</div>
-    <div role="radiogroup" aria-labelledby="ptype-label" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(128px,1fr))",gap:6}}>
+    <div role="radiogroup" aria-labelledby="ptype-label" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:6}}>
       {Object.entries(PTYPES).map(([k,t])=>{const on=value===k;return(
         <button key={k} type="button" role="radio" aria-checked={on} onClick={()=>onPick(k)} style={{textAlign:"left",padding:"8px 10px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",background:on?"rgba(88,166,255,0.12)":"transparent",border:"1px solid "+(on?tb:"#30363d"),transition:"border-color 0.15s, background 0.15s"}}>
           <div style={{fontSize:12.5,fontWeight:600,color:on?"#e6edf3":"#c9d1d9"}}>{t.label}</div>
@@ -435,7 +443,7 @@ function TypePicker({value,onPick,custom}){
     </div>
     <div style={{fontSize:11,color:custom?yl:"#8b949e",marginTop:7,lineHeight:1.45}}>{custom
       ?<>Customized from the {PTYPES[value].label.toLowerCase()} template · <button type="button" onClick={()=>onPick(value)} style={{background:"none",border:"none",padding:0,color:tb,fontSize:11,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}}>Reset to template</button></>
-      :"Typical 2025–2026 costs for this type. Adjust any line below, or click a value to type in a quote."}</div>
+      :"Typical 2025–2026 costs for this type. Adjust any line below, or type a quote into its $ box."}</div>
   </div>);
 }
 
@@ -618,7 +626,7 @@ const ltCard={background:LT.card,border:"1px solid "+LT.border,borderRadius:12,b
 
 // Shared page header for both views, so the actions sit in the same place: an optional
 // Reset, then Print, then Copy model link as the rightmost (primary) button.
-function PageHeader({dark,title,subtitle,copied,onCopy,onReset,confirmReset}){
+function PageHeader({dark,title,subtitle,meta,copied,onCopy,onReset,confirmReset}){
   const btn={borderRadius:8,fontSize:13,fontWeight:600,padding:"10px 18px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",transition:"background 0.15s, border-color 0.15s"};
   const sec=dark?{...btn,background:"transparent",border:"1px solid #30363d",color:"#c9d1d9"}:{...btn,background:LT.card,border:"1px solid "+LT.border,color:LT.body};
   const pri=dark
@@ -629,6 +637,7 @@ function PageHeader({dark,title,subtitle,copied,onCopy,onReset,confirmReset}){
     <div style={{flex:"1 1 320px",minWidth:0}}>
       <h1 style={{fontFamily:"'Fraunces',serif",fontSize:30,fontWeight:700,margin:"0 0 6px",letterSpacing:"-0.02em",color:dark?"#e6edf3":LT.text}}>{title}</h1>
       <p style={{color:dark?"#8b949e":LT.body,fontSize:14,margin:0,lineHeight:1.5}}>{subtitle}</p>
+      {meta&&<p style={{color:dark?"#8b949e":LT.muted,fontSize:12.5,margin:"6px 0 0",lineHeight:1.5}}>{meta}</p>}
     </div>
     <div className="no-print" style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap",marginLeft:"auto"}}>
       {onReset&&<button type="button" onClick={onReset} style={confirmReset?warn:sec}>{confirmReset?"Click again to confirm":"Reset all"}</button>}
@@ -721,7 +730,7 @@ function PrintReport({rep}){
     {/* PAGE 2 — over time */}
     <div style={{breakBefore:"page"}}>
       <H2 first>Cash Position Over Time</H2>
-      <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Cumulative money in and out of pocket: down payment, then each month's rent after expenses, loan payments{rep.incomeTax>0?" and income tax":""}. Payback is where the line crosses zero.</div>
+      <div style={{fontSize:9.5,color:RP.body,marginBottom:4}}>Cumulative money in and out of pocket: down payment, then each month's rent after expenses, minus loan payments{rep.incomeTax>0?" and income tax":""}. Payback is where the line crosses zero.</div>
       <TimeChart pts={cm.pts} height={210} ariaLabel="Cumulative cash position by year"
         series={[{key:"cash",color:"#15803d",width:2}]} area={{pos:"#15803d",neg:"#b45309"}}
         pointColor={p=>p.cash>=0?"#15803d":"#b45309"}
@@ -925,8 +934,8 @@ function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedB
 
   return(<>
     <PageHeader title="Your ADU Investment Summary" copied={copied} onCopy={copyShare}
+      meta={(preparedFor||preparedBy)?<>{preparedFor&&<>Prepared for <strong style={{color:LT.body}}>{preparedFor}</strong></>}{preparedFor&&preparedBy?" · ":""}{preparedBy&&<>Prepared by <strong style={{color:LT.body}}>{preparedBy}</strong></>}</>:null}
       subtitle={sqft+" sq ft "+utype.toLowerCase()+" "+unitNoun+" · "+(origFeeAmt>0?fD(assetCost)+" to build + "+fD(origFeeAmt)+" loan fee = "+fD(total)+" project":fD(total)+" project")+" · "+(loanAmt>0?rate.toFixed(1)+"% / "+term+"-year financing"+(cashDownAmt>0?" · "+fD(cashDownAmt)+" down":""):"paid in cash")}/>
-    {(preparedFor||preparedBy)&&<div style={{fontSize:12.5,color:LT.muted,marginTop:-16,marginBottom:20}}>{preparedFor&&<>Prepared for <strong style={{color:LT.body}}>{preparedFor}</strong></>}{preparedFor&&preparedBy?" · ":""}{preparedBy&&<>Prepared by <strong style={{color:LT.body}}>{preparedBy}</strong></>}</div>}
     {/* THE SHORT ANSWER — the verdict first, before any inputs */}
     {verdict&&(
       <div style={{...ltCard,padding:"20px 24px",marginBottom:16,borderLeft:"4px solid "+(cm.ret>=0?LT.pos:LT.neg)}}>
@@ -950,12 +959,10 @@ function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedB
             <label htmlFor="cRent" style={{...fieldLabel,display:"block"}}>Monthly rent{!hasCustom&&<span style={{color:LT.warn,textTransform:"none",letterSpacing:0,fontWeight:500}}> — required</span>}</label>
             <div style={{position:"relative",maxWidth:220}}>
               <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,color:LT.muted,pointerEvents:"none",fontFamily:"'Fraunces',serif"}}>$</span>
-              <input id="cRent" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>setCustomRent(parseInt(e.target.value)||0)} placeholder="e.g. 2000" style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"8px 44px 8px 26px",color:LT.text,fontSize:16,fontFamily:"'Fraunces',serif",outline:"none",boxSizing:"border-box"}}/>
+              <RentInput id="cRent" value={customRent} onChange={setCustomRent} style={{width:"100%",background:LT.card,border:"1px solid "+(hasCustom?LT.border:LT.warn+"80"),borderRadius:6,padding:"8px 44px 8px 26px",color:LT.text,fontSize:16,fontFamily:"'Fraunces',serif",outline:"none",boxSizing:"border-box"}}/>
               <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:12,color:LT.muted,pointerEvents:"none"}}>/mo</span>
             </div>
             <div style={fieldNote}>What you'd list this {sqft} sq ft {utype.toLowerCase()} for. Check local listings — this size runs about {fD(sizeAnchor)}/mo at the U.S. average and {fD(rentLo)}–{fD(rentHi)}/mo across major metros.</div>
-            <label htmlFor="cLoc" style={{...fieldLabel,display:"block",marginTop:10}}>Label <span style={{textTransform:"none",letterSpacing:0,fontWeight:400}}>(optional)</span></label>
-            <input id="cLoc" className="fld" type="text" value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="e.g. Portland — Alberta" style={{width:"100%",maxWidth:260,background:LT.card,border:"1px solid "+LT.border,borderRadius:6,padding:"7px 10px",color:LT.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
           </>)}
         </div>
 
@@ -1146,7 +1153,7 @@ function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedB
     {/* WHERE THE MONEY GOES */}
     <div style={{...ltCard,padding:"22px 26px",marginBottom:20}}>
       <div style={{...secH,marginBottom:12}}>Where the money goes</div>
-      <CostWaterfall steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={ptypeKey} typeNoun={unitNoun} range={costRange}/>
+      <CostWaterfall steps={costSteps} total={total} buildTotal={assetCost} sqft={sqft} ptypeKey={ptypeKey} typeNoun={unitNoun}/>
     </div>
 
     {/* PROPERTY VALUE */}
@@ -1160,12 +1167,12 @@ function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedB
         <div style={{textAlign:"center",padding:"14px 10px",borderRadius:10,background:LT.borderLight}}>
           <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:500,marginBottom:6}}>Value when complete</div>
           <div style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:cm.valueY1>=total?LT.pos:LT.warn}}>{fD(cm.valueY1)}</div>
-          <div style={{fontSize:12,color:cm.valueY1>=total?LT.pos:LT.warn,fontWeight:600,marginTop:2}}>{(cm.valueY1/total).toFixed(1)}× your cost</div>
+          <div style={{fontSize:12,color:cm.valueY1>=total?LT.pos:LT.warn,fontWeight:600,marginTop:2}}>{(cm.valueY1/total).toFixed(2)}× your cost</div>
         </div>
         <div style={{textAlign:"center",padding:"14px 10px",borderRadius:10,background:cm.valueEnd>=total?LT.posBg:LT.warnBg}}>
           <div style={{fontSize:11,color:LT.muted,textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:500,marginBottom:6}}>{loanAmt>0?"Value at loan payoff":"Value in year "+cm.evalYrs}</div>
           <div style={{fontFamily:"'Fraunces',serif",fontSize:22,fontWeight:700,color:cm.valueEnd>=total?LT.pos:LT.warn}}>{fK2(cm.valueEnd)}</div>
-          <div style={{fontSize:12,color:cm.valueEnd>=total?LT.pos:LT.warn,fontWeight:600,marginTop:2}}>{(cm.valueEnd/total).toFixed(1)}× your cost</div>
+          <div style={{fontSize:12,color:cm.valueEnd>=total?LT.pos:LT.warn,fontWeight:600,marginTop:2}}>{(cm.valueEnd/total).toFixed(2)}× your cost</div>
         </div>
       </div>
       <div style={{fontSize:12.5,color:LT.body,lineHeight:1.6}}>
@@ -1590,14 +1597,14 @@ function App(){
         ["Value multiplier",grm+"× monthly long-term rent"],
       ],
       notes:[
-        ...(saleOn?["If sold after "+saleYear+" years of renting: the ADU's estimated "+fD(cm.sale.value)+" share of the sale price, less "+sellCost+"% selling costs"+(cm.sale.bal>0?", the "+fD(cm.sale.bal)+" loan balance":"")+(cm.sale.recapture>0?" and "+fD(cm.sale.recapture)+" depreciation recapture":"")+(cm.sale.nolBenefit>0?", plus "+fD(cm.sale.nolBenefit)+" from released losses":"")+", leaves "+fD(cm.sale.proceeds)+" — a net gain of "+fD(cm.sale.net)+" including cash flow while owned. Capital gains tax isn't modeled."]:[]),
-        ...(firmOn?["Budget confidence: "+Math.round(bc.firmedPct)+"% of line-item costs are quoted or known. P50 build cost "+fD(bc.p50)+", P80 "+fD(bc.p80)+"; the budget, with "+contingency+"% contingency, covers the build about "+Math.round(bc.coverage)+"% of the time"+(bc.suggested!==contingency?" (P80 needs "+bc.suggested+"%)":"")+"."]:[]),
-        ...(facts?(()=>{const lc=t=>t[0].toLowerCase()+t.slice(1);return["Site work is estimated from site facts — foundation: "+lc(sf.why.foundation)+"; grading and access: "+lc(sf.why.sitePrep)+"; utilities: "+lc(sf.why.utilTrench)+"; electrical: "+lc(sf.why.electrical)+"; surveys: "+lc(sf.why.surveys)+"."]})():[]),
         "Rent is the figure entered. The ADU's value is estimated at "+grm+"× monthly long-term rent (a gross rent multiplier); appraisals rely on comparable sales and may differ, and coastal markets often run 200–300×.",
         "The model runs month by month from project start."+(buildMonths>0?" During the "+buildMonths+"-month build there is no rent; funds are drawn on a standard construction schedule (soft costs up front, owner cash first, hard costs on an S-curve with 5% retention)"+(loanAmt>0?(conIntMode==="none"?". Construction interest is not charged in this scenario.":", with interest on the drawn balance."):"."):""),
         "Operating costs are vacancy, maintenance, management"+(hasSTR?", hosting":"")+", property tax and insurance, each escalating at the rates shown.",
         incomeTax>0?"Income tax is applied at "+incomeTax+"% to rental income after "+(loanAmt>0?"loan interest and ":"")+"27.5-year depreciation of "+fD(depBasis)+" (furnishings excluded; construction interest capitalized)."+(lossCarry?" Early paper losses carry forward against later rental income.":" Early paper losses are ignored rather than carried forward.")+" Losses aren't deducted against other income.":"Income tax is not modeled; figures are pre-tax.",
         "Payback is when cumulative cash — down payment, construction interest and monthly cash flow — returns to zero. Annual returns are compound rates on the total project cost.",
+        ...(facts?(()=>{const lc=t=>t[0].toLowerCase()+t.slice(1);return["Site work is estimated from site facts — foundation: "+lc(sf.why.foundation)+"; grading and access: "+lc(sf.why.sitePrep)+"; utilities: "+lc(sf.why.utilTrench)+"; electrical: "+lc(sf.why.electrical)+"; surveys: "+lc(sf.why.surveys)+"."]})():[]),
+        ...(firmOn?["Budget confidence: "+Math.round(bc.firmedPct)+"% of line-item costs are quoted or known. P50 build cost "+fD(bc.p50)+", P80 "+fD(bc.p80)+"; the budget, with "+contingency+"% contingency, covers the build about "+Math.round(bc.coverage)+"% of the time"+(bc.suggested!==contingency?" (P80 needs "+bc.suggested+"%)":"")+"."]:[]),
+        ...(saleOn?["If sold after "+saleYear+" years of renting: the ADU's estimated "+fD(cm.sale.value)+" share of the sale price, less "+sellCost+"% selling costs"+(cm.sale.bal>0?", the "+fD(cm.sale.bal)+" loan balance":"")+(cm.sale.recapture>0?" and "+fD(cm.sale.recapture)+" depreciation recapture":"")+(cm.sale.nolBenefit>0?", plus "+fD(cm.sale.nolBenefit)+" from released losses":"")+", leaves "+fD(cm.sale.proceeds)+" — a net gain of "+fD(cm.sale.net)+" including cash flow while owned. Capital gains tax isn't modeled."]:[]),
         "Not included: solar (required on new California homes), landscaping restoration, HOA fees, refinancing, or the costs of selling.",
       ],
     };
@@ -1619,7 +1626,7 @@ function App(){
         </div>
 
       {view==="internal"&&(<>
-        <PageHeader dark title="Can ADU Rent Cover the Loan?" subtitle="Build up costs from real components, set expenses and rent growth, and see whether the rent covers the loan." copied={copied} onCopy={copyShare} onReset={onResetClick} confirmReset={confirmReset}/>
+        <PageHeader dark title="Can ADU Rent Cover the Loan?" subtitle="Estimate what the ADU will cost, compare how to finance it, and see whether the rent pays for it." copied={copied} onCopy={copyShare} onReset={onResetClick} confirmReset={confirmReset}/>
 
         {/* STICKY MINI SUMMARY — narrow screens only; wide screens have the sticky results column */}
         <div className="no-print mini-bar" style={{position:"sticky",top:0,zIndex:45,background:"#0d1117",border:"1px solid #21262d",borderRadius:8,padding:"10px 16px",marginBottom:16,display:"flex",gap:20,flexWrap:"wrap",alignItems:"baseline",boxShadow:"0 6px 16px rgba(0,0,0,0.35)"}}>
@@ -1716,10 +1723,9 @@ function App(){
         <Section title="Financing" open={openSec.financing} onToggle={()=>toggleSec("financing")} summary={loanAmt>0?<><span style={{fontSize:11,color:"#8b949e"}}>Loan amount</span><span style={{fontSize:openSec.financing?18:15,fontFamily:"'Fraunces',serif",fontWeight:700,color:tb,marginLeft:8}}>{fD(loanAmt)}</span></>:<span style={{fontSize:12,color:"#8b949e"}}>All cash</span>}>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <TS label="Cash / equity down" value={cashDown} onChange={set("cashDown")} typeMin={LIM.cashDown[0]} typeMax={LIM.cashDown[1]} min={0} max={100} step={5} format={v=>v===0?"100% financed":v+"% ("+fD(cashDownAmt)+")"} ticks={[{value:0,label:"All loan",color:tb},{value:20,label:"20%",color:tk},{value:50,label:"50/50",color:tk},{value:100,label:"All cash",color:gn}]}/>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18}}>
-              <Sl label="Interest rate" value={rate} onChange={set("rate")} typeMin={LIM.rate[0]} typeMax={LIM.rate[1]} min={3} max={14} step={0.5} format={v=>v.toFixed(1)+"%"}/>
-              {isCash?<Sl label="Years to evaluate" value={horizon} onChange={set("horizon")} typeMin={LIM.horizon[0]} typeMax={LIM.horizon[1]} min={5} max={30} step={1} format={v=>v+" yr"}/>:<Sl label="Loan term" value={term} onChange={set("term")} typeMin={LIM.term[0]} typeMax={LIM.term[1]} min={5} max={20} step={1} format={v=>v+" yr"}/>}
-            </div>
+            <TS label="Interest rate" value={rate} onChange={set("rate")} typeMin={LIM.rate[0]} typeMax={LIM.rate[1]} min={3} max={14} step={0.5} format={v=>v.toFixed(v%1?2:1).replace(/0$/,"")+"%"}/>
+            {isCash?<TS label="Years to evaluate" value={horizon} onChange={set("horizon")} typeMin={LIM.horizon[0]} typeMax={LIM.horizon[1]} min={5} max={30} step={1} format={v=>v+" years"}/>
+              :<TS label="Loan term" value={term} onChange={set("term")} typeMin={LIM.term[0]} typeMax={LIM.term[1]} min={5} max={20} step={1} format={v=>v+" years"}/>}
             <div style={{marginTop:2}}>
               <Tog on={origFeeOn} onToggle={()=>set("origFeeOn")(!origFeeOn)} label="Loan origination / dealer fee" sub={origFeeOn?"Baked into the project price — like solar, the fee is invisible to the borrower":"Off — no origination fee (e.g. HELOC, credit union loan)"}/>
               {origFeeOn&&(
@@ -1781,7 +1787,7 @@ function App(){
             <TS label="Property tax growth" value={taxGrowth} onChange={set("taxGrowth")} typeMin={LIM.taxGrowth[0]} typeMax={LIM.taxGrowth[1]} min={0} max={6} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:gn},{value:2,label:"CA Prop 13 cap",color:tb},{value:3,label:"Avg reassess",color:tk},{value:5,label:"Hot market",color:yl}]}/>
             <TS label={<>Insurance ({fD(Math.round(insBase*insurance/100))}/yr)<IT align="left" text={"A rate on the building's replacement cost — the structure and foundation plus the builder's margin on them ("+fD(insBase)+"). Permits, fees, design, site work and furniture aren't part of dwelling coverage. Rate as a percentage of replacement cost is how insurers actually quote.\n\nLandlord policies (DP-3) run 15–25% above owner-occupied rates. Short-term rentals are excluded from standard and landlord policies — STR-specific coverage (Proper, Steadily, commercial) runs 2–3× landlord rates. Airbnb host protection is a supplement, not a replacement.\n\nCA wildfire-zone properties on the FAIR Plan can hit 1.5–2.5%."}/></>} value={insurance} onChange={set("insurance")} typeMin={LIM.insurance[0]} typeMax={LIM.insurance[1]} min={0.2} max={3.5} step={0.1} format={v=>v.toFixed(1)+"% of cost"} ticks={[{value:0.3,label:"HI / VT",color:gn},{value:0.45,label:"CA / PNW",color:tb},{value:0.65,label:"Natl avg",color:tk},{value:1.2,label:"TX / CO",color:yl},{value:1.8,label:"OK / KS / NE",color:yl},{value:2.8,label:"FL coastal",color:rd}]}/>
             <TS label="Insurance growth" value={insGrowth} onChange={set("insGrowth")} typeMin={LIM.insGrowth[0]} typeMax={LIM.insGrowth[1]} min={0} max={15} step={0.5} format={v=>v===0?"Flat":"+"+v+"%/yr"} ticks={[{value:0,label:"Flat",color:gn},{value:3,label:"Inflation",color:tk},{value:6,label:"Natl recent",color:tb},{value:10,label:"CA / FL",color:yl},{value:14,label:"Crisis",color:rd}]}/>
-            <TS label={<>Marginal income tax rate<IT align="left" text={"Combined federal + state rate. Applied to taxable rental income after deducting loan interest and depreciation ("+fD(Math.round(depBasis/27.5))+"/yr).\n\nIn early years, deductions often exceed income — no tax owed. Tax grows as the loan amortizes and interest shrinks. Cov. and +/− are always pre-tax year-1."}/></>} value={incomeTax} onChange={set("incomeTax")} typeMin={LIM.incomeTax[0]} typeMax={LIM.incomeTax[1]} min={0} max={50} step={1} format={v=>v===0?"Not modeled":v+"%"} ticks={[{value:0,label:"Not modeled",color:gn},{value:22,label:"22% fed",color:tk},{value:32,label:"32% fed",color:tb},{value:37,label:"Top fed",color:yl},{value:46,label:"+CA state",color:rd}]}/>
+            <TS label={<>Marginal income tax rate<IT align="left" text={"Combined federal + state rate. Applied to taxable rental income after deducting loan interest and depreciation ("+fD(Math.round(depBasis/27.5))+"/yr).\n\nIn early years, deductions often exceed income — no tax owed. Tax grows as the loan amortizes and interest shrinks. Coverage and After loan payment are always pre-tax, first-month figures."}/></>} value={incomeTax} onChange={set("incomeTax")} typeMin={LIM.incomeTax[0]} typeMax={LIM.incomeTax[1]} min={0} max={50} step={1} format={v=>v===0?"Not modeled":v+"%"} ticks={[{value:0,label:"Not modeled",color:gn},{value:22,label:"22% fed",color:tk},{value:32,label:"32% fed",color:tb},{value:37,label:"Top fed",color:yl},{value:46,label:"+CA state",color:rd}]}/>
             {incomeTax>0&&<Tog on={lossCarry} onToggle={()=>set("lossCarry")(!lossCarry)} label={<>Carry rental losses forward<IT align="left" text={"In the early years, loan interest and depreciation usually make the ADU show a loss on paper even when cash comes in. Most owners can't deduct that loss against their salary (the passive-loss rules phase that out above $100K–$150K of income), but the loss isn't lost: it carries forward and offsets the ADU's rental income in later years, and anything left is deductible when you sell.\n\nTurn this off to see the more conservative case where early losses are simply ignored."}/></>} sub={lossCarry?"Early paper losses offset later rental income, lowering tax in later years":"Off — early paper losses are ignored (more conservative)"}/>}
             <div style={{fontSize:11,color:"#6e7681",lineHeight:1.45}}>For income tax, the building is written off as depreciation ({fD(Math.round(depBasis/27.5))}/yr over 27.5 years, furnishings excluded).</div>
           </div>
@@ -1810,14 +1816,14 @@ function App(){
           </div>
           {isSTR?(<div style={{fontSize:11,color:yl}}>Not used in STR mode — rent is set by the nightly rate above.</div>):(<>
           <p style={{margin:"0 0 12px",fontSize:11,color:"#6e7681",lineHeight:1.5,maxWidth:640}}>
-            Enter the monthly rent you expect to collect for this {sqft} sq ft {utype.toLowerCase()} — the figure you'd list it at, not a per-square-foot base. It is used exactly as typed. For scale, a {sqft} sq ft unit runs about {fD(sizeAnchor)}/mo at the U.S. average, and roughly {fD(rentLo)}–{fD(rentHi)}/mo across major metros.
+            What you'd list this {sqft} sq ft {utype.toLowerCase()} for. For scale: about {fD(sizeAnchor)}/mo at the U.S. average, {fD(rentLo)}–{fD(rentHi)}/mo across major metros.
           </p>
           <div style={{display:"flex",alignItems:"flex-end",gap:16,flexWrap:"wrap"}}>
             <div style={{display:"flex",flexDirection:"column",gap:5}}>
               <label htmlFor="rentAmt" style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:500}}>Monthly rent</label>
               <div style={{display:"flex",alignItems:"center",gap:5}}>
                 <span style={{fontSize:14,color:"#8b949e",fontFamily:"'Fraunces',serif"}}>$</span>
-                <input id="rentAmt" className="fld" type="number" inputMode="numeric" min={0} step={25} value={customRent||""} onChange={e=>set("customRent")(parseInt(e.target.value)||0)} placeholder="e.g. 2000" style={{background:"#0d1117",border:"1px solid "+(hasCustom?"#30363d":yl+"80"),borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:15,fontFamily:"'Fraunces',serif",width:120,outline:"none"}}/>
+                <RentInput id="rentAmt" value={customRent} onChange={set("customRent")} style={{background:"#0d1117",border:"1px solid "+(hasCustom?"#30363d":yl+"80"),borderRadius:6,padding:"7px 10px",color:"#e6edf3",fontSize:15,fontFamily:"'Fraunces',serif",width:120,outline:"none"}}/>
                 <span style={{fontSize:11,color:"#8b949e"}}>/mo</span>
               </div>
             </div>
@@ -1837,7 +1843,7 @@ function App(){
         <div style={{...card,padding:"18px 22px",marginBottom:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:16}}>
             <div>
-              <div style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600,marginBottom:4}}>Break-even rent<IT text={"Gross monthly rent that exactly covers loan payment, property tax, and insurance after vacancy and operating costs.\n\nYear 1, pre-tax. Rent growth and tax deductions are not counted here — they are what CF+ and Payback add."} align="left"/></div>
+              <div style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600,marginBottom:4}}>Break-even rent<IT text={"Gross monthly rent that exactly covers loan payment, property tax, and insurance after vacancy and operating costs.\n\nYear 1, pre-tax. Rent growth and tax deductions are not counted here — they are what Cash-flow positive and Payback add."} align="left"/></div>
               <div style={{fontFamily:"'Fraunces',serif",fontSize:30,fontWeight:700,color:"#e6edf3",lineHeight:1.1}}>{fD(be)}<span style={{fontSize:15,color:"#8b949e",fontWeight:400}}>/mo</span></div>
             </div>
             <div style={{textAlign:"right"}}>
@@ -1856,16 +1862,16 @@ function App(){
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
           {[
             {k:"Rent",v:fD(r.rent)+"/mo",c:"#e6edf3",s:"Year 1, as entered"},
-            {k:"Net",v:fD(r.net)+"/mo",c:"#e6edf3",s:"After property tax, insurance, opex"},
-            {k:"Cov.",v:covN===null?"No loan":covN.toFixed(0)+"%",c:covC,s:covN===null?"All cash \u2014 no payment to cover":"Net rent \u00f7 loan payment"},
-            {k:"+/\u2212",v:(r.sur>=0?"+":"")+fD(r.sur)+"/mo",c:r.sur>=0?gn:rd,s:r.sur>=0?"Passive income":"Monthly subsidy"},
-            {k:"CF+",v:r.cfPlus<=0?"Now":fYr(r.cfPlus)+(r.cfAtTerm?"*":""),c:r.cfPlus<=3?gn:r.cfPlus<=term&&!r.cfAtTerm?yl:rd,s:r.cfPlus===Infinity?"Expenses outpace rent":r.cfAtTerm?"Only once the loan ends":"From project start"},
+            {k:"Net",l:"Net rent",v:fD(r.net)+"/mo",c:"#e6edf3",s:"After property tax, insurance, opex"},
+            {k:"Cov.",l:"Coverage",v:covN===null?"No loan":covN.toFixed(0)+"%",c:covC,s:covN===null?"All cash \u2014 no payment to cover":"Net rent \u00f7 loan payment"},
+            {k:"+/\u2212",l:"After loan payment",v:(r.sur>=0?"+":"")+fD(r.sur)+"/mo",c:r.sur>=0?gn:rd,s:r.sur>=0?"Passive income":"Monthly subsidy"},
+            {k:"CF+",l:"Cash-flow positive",v:r.cfPlus<=0?"Now":fYr(r.cfPlus)+(r.cfAtTerm?"*":""),c:r.cfPlus<=3?gn:r.cfPlus<=term&&!r.cfAtTerm?yl:rd,s:r.cfPlus===Infinity?"Expenses outpace rent":r.cfAtTerm?"Only once the loan ends":"From project start"},
             {k:"Payback",v:r.po===0?"Immediate":fYr(r.po),c:r.po<=term?gn:r.po<=term*1.5?yl:rd,s:r.po===0?"Never out of pocket":"Until all cash put in is back"},
             {k:"Equity",v:fK(r.eq),c:eqC,s:`${Math.round(eqR*100)}% of project cost`},
             {k:"Return",v:fK(r.ret),c:r.ret>0?gn:rd,s:`${pctTxt(r.roi)} on project cost · `+(roiCash!==null?`${pctTxt(roiCash)} on cash invested`:"no cash invested")},
           ].map(m=>(
             <div key={m.k} style={{...card,padding:"12px 14px"}}>
-              <div style={{fontSize:10.5,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:5,display:"flex",alignItems:"center"}}>{m.k}<IT text={CI[m.k]} align="left"/></div>
+              <div style={{fontSize:10.5,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:5,display:"flex",alignItems:"center"}}>{m.l||m.k}<IT text={CI[m.k]} align="left"/></div>
               <div style={{fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:600,color:m.c,lineHeight:1.15}}>{m.v}</div>
               <div style={{fontSize:10.5,color:"#6e7681",marginTop:4,lineHeight:1.4}}>{m.s}</div>
             </div>
@@ -1884,9 +1890,9 @@ function App(){
             <span style={{fontSize:13,color:"#8b949e"}}>{showHow?"▴":"▾"}</span>
           </button>
           {showHow&&(<div style={{padding:"0 22px 18px",fontSize:11.5,lineHeight:1.7,color:"#8b949e",display:"flex",flexDirection:"column",gap:10,maxWidth:820}}>
-            <div><strong style={{color:"#e6edf3"}}>Reading the results.</strong> Cov. and +/− are first-month, pre-tax cash flow. CF+, Payback and Return include rent growth{incomeTax>0?" and income tax at "+incomeTax+"%":""}. Equity is the value multiplier ({grm}× long-term rent) — a heuristic; appraisals use comparable sales.</div>
+            <div><strong style={{color:"#e6edf3"}}>Reading the results.</strong> Coverage and After loan payment are first-month, pre-tax figures. Cash-flow positive, Payback and Return include rent growth{incomeTax>0?" and income tax at "+incomeTax+"%":""}. Equity is the value multiplier ({grm}× long-term rent) — a heuristic; appraisals use comparable sales.</div>
             <div><strong style={{color:"#e6edf3"}}>What's in the cost.</strong> Structure $/sq ft covers the shell, finishes, systems and built-in appliances; foundation, site work and furnishing are separate lines. The builder margin ({markup}%, {fD(markupAmt)}) is included. Not included: solar panels (required on new California homes, about $5–10K), landscaping restoration, or HOA fees.</div>
-            <div><strong style={{color:"#e6edf3"}}>How rental income is taxed.</strong> It goes on Schedule E — no LLC needed. You deduct expenses, loan interest and depreciation. Early on, deductions usually exceed income, so no tax is owed; as interest shrinks, taxable income grows. The passive-loss rules limit using those early losses against other income (the $25K allowance phases out between $100K and $150K of income), but they carry forward — set under Taxes & insurance. The income tax rate applies to CF+, Payback and Return; leave it at 0% for a pre-tax view.</div>
+            <div><strong style={{color:"#e6edf3"}}>How rental income is taxed.</strong> It goes on Schedule E — no LLC needed. You deduct expenses, loan interest and depreciation. Early on, deductions usually exceed income, so no tax is owed; as interest shrinks, taxable income grows. The passive-loss rules limit using those early losses against other income (the $25K allowance phases out between $100K and $150K of income), but they carry forward — set under Taxes & insurance. The income tax rate applies to Cash-flow positive, Payback and Return; leave it at 0% for a pre-tax view.</div>
             <div style={{color:tb}}>Settings are saved automatically in this browser.</div>
           </div>)}
         </div>

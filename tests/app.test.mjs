@@ -76,7 +76,7 @@ describe("bug fixes", () => {
     assert.match((await load("?rentalMode=hybrid&customRent=2000&strMonths=6&strADR=100")).text(), /\$2,520\/mo/);
   });
   test("CF+ is 'Now' / 'Day one' when positive from the first rent check", async () => {
-    assert.match((await load("?customRent=6000&term=20&rate=3")).text(), /CF\+.{0,3}Now/);
+    assert.match((await load("?customRent=6000&term=20&rate=3")).text(), /Cash-flow positive\?Now/);
     assert.equal((await load("?customRent=6000&term=20&rate=3&view=consumer")).card("Years to cash positive"), "Day one");
   });
   test("all-cash coverage shows 'No loan'", async () => {
@@ -104,7 +104,7 @@ describe("saved model and share links", () => {
   });
   test("a shared link doesn't overwrite the saved model until the visitor edits", async () => {
     const p = await load("?customRent=3333&view=consumer", { stored: saved });
-    assert.equal(p.doc.querySelector("#cRent").value, "3333");
+    assert.equal(p.doc.querySelector("#cRent").value, "3,333");
     assert.equal(p.saved().customRent, 2777);
     await p.click("Full model");
     assert.equal(p.saved().customRent, 2777, "switching tabs is not an edit");
@@ -289,7 +289,7 @@ describe("cost as a range", () => {
   test("the Summary, the breakdown and the report all show the same 80% range", async () => {
     const c = await load("?customRent=2600&view=consumer");
     assert.ok(c.text().includes("Project cost estimate $299,150 — likely " + fmt(lo) + "–" + fmt(hi) + " as built (80% range; rough estimate"), c.text().match(/Project cost estimate.{0,120}/)?.[0]);
-    assert.ok(c.text().includes("Likely final cost: " + fmt(lo) + "–" + fmt(hi)));
+    assert.ok(!c.text().includes("Likely final cost:"), "shown once on the Summary (under the verdict), not repeated in the breakdown");
     assert.match(c.report().textContent, new RegExp("Likely final cost \\" + fmt(lo).replace(",", ",") + "–"));
     assert.ok((await load("?customRent=2600")).text().includes("Likely final cost: " + fmt(lo) + "–" + fmt(hi)), "Full model too");
   });
@@ -372,6 +372,32 @@ describe("water & sewer ticks by city", () => {
     assert.match(row((await load("?customRent=2600&hookupCity=atlantis")).text()), /San Diego/);
     await p.click("Sources & data provenance");
     assert.match(p.text(), /2026 System Development Charges — Denver Water.*Rates and Fees \(Impact Fees\) — Austin Water.*ADU System Development Charge Waiver — City of Portland/);
+  });
+});
+
+describe("design polish", () => {
+  test("Full model metric cards use plain labels", async () => {
+    const t = (await load("?customRent=2600")).text();
+    assert.match(t, /RENT|Rent\?/);
+    assert.match(t, /Net rent\?.*Coverage\?.*After loan payment\?.*Cash-flow positive\?.*Payback\?.*Equity\?.*Return\?/);
+    assert.doesNotMatch(t, /Cov\.\?|CF\+\?/);
+  });
+  test("rent boxes show commas and stay blank until filled", async () => {
+    const p = await load("?customRent=2600");
+    assert.equal(p.doc.querySelector("#rentAmt").value, "2,600");
+    const e = await load("?sqft=600");
+    assert.equal(e.doc.querySelector("#rentAmt").value, "");
+    assert.equal(e.doc.querySelector("#rentAmt").placeholder, "e.g. 2,000");
+  });
+  test("the Summary no longer asks for a project label; value vs cost is precise", async () => {
+    const c = await load("?customRent=2600&view=consumer");
+    assert.ok(c.doc.querySelector("#cLoc") === null);
+    assert.match(c.text(), /Value when complete\$286,0000\.96× your cost/);
+  });
+  test("financing rate and term use the standard sliders", async () => {
+    const { doc } = await load("?customRent=2600");
+    const labels = [...doc.querySelectorAll(".int-inputs span[id]")].map(s => s.textContent);
+    assert.ok(labels.includes("Interest rate") && labels.includes("Loan term"));
   });
 });
 
@@ -880,6 +906,14 @@ describe("printed report", () => {
     const svgs = r.querySelectorAll("svg[role=img]");
     assert.equal(svgs.length, 2);
     for (const svg of svgs) { assert.ok(svg.getAttribute("viewBox")); assert.equal(svg.style.width, "100%"); }
+  });
+  test("method notes come first and 'Not included' last", async () => {
+    const r = (await load("?customRent=2600&firmOn=1&siteMode=facts")).report();
+    const items = [...r.querySelectorAll("li")].map(li => li.textContent);
+    assert.match(items[0], /^Rent is the figure entered/);
+    assert.match(items.at(-1), /^Not included/);
+    const i = re => items.findIndex(t => re.test(t));
+    assert.ok(i(/^Payback is when/) < i(/^Site work is estimated/) && i(/^Site work/) < i(/^Budget confidence/) && i(/^Budget confidence/) < i(/^If sold after/));
   });
   test("headings are in Title Case", async () => {
     const r = (await load("?customRent=2600&cashDown=20&cmpOn=1")).report();
