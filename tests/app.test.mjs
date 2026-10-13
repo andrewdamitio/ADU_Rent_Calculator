@@ -409,10 +409,10 @@ describe("streamlined layout", () => {
     assert.doesNotMatch(t, /Income tax \(not modeled/);
     const chart = () => p.doc.querySelectorAll(".screen-only svg[role=img]")[1].querySelectorAll("path[fill=none]").length;
     assert.equal(chart(), 4, "value, loan and cash lines show by default");
-    assert.match(p.text(), /Net equityADU valueLoan balanceCash positionHide the parts/);
-    await p.click("Hide the parts");
+    assert.match(p.text(), /Net equityADU valueLoan balanceCash positionHide ADU value, loan balance & cash position/);
+    await p.click("Hide ADU value, loan balance & cash position");
     assert.equal(chart(), 1);
-    await p.click("Show what makes it up");
+    await p.click("Show ADU value, loan balance & cash position");
     assert.equal(chart(), 4);
     assert.match((await load("?customRent=2600&incomeTax=24&view=consumer")).text(), /Income tax \(24% marginal rate\)/);
   });

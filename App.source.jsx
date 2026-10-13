@@ -1224,7 +1224,7 @@ function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedB
         {showParts&&<><span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dotted #d97706",verticalAlign:"middle",marginRight:5}}/>ADU value</span>
         <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dashed #ef4444",verticalAlign:"middle",marginRight:5}}/>Loan balance</span>
         <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dashed #16a34a",verticalAlign:"middle",marginRight:5}}/>Cash position</span></>}
-        <button type="button" className="no-print" onClick={()=>setShowParts(v=>!v)} aria-pressed={showParts} style={{marginLeft:"auto",background:showParts?"transparent":LT.infoBg,border:"1px solid "+LT.info,borderRadius:999,padding:"4px 12px",color:LT.info,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{showParts?"Hide the parts":"Show what makes it up"}</button>
+        <button type="button" className="no-print" onClick={()=>setShowParts(v=>!v)} aria-pressed={showParts} style={{marginLeft:"auto",background:showParts?"transparent":LT.infoBg,border:"1px solid "+LT.info,borderRadius:999,padding:"4px 12px",color:LT.info,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{(showParts?"Hide":"Show")+" ADU value, loan balance & cash position"}</button>
       </div>
     </div>
 
