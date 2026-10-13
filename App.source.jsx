@@ -1827,7 +1827,6 @@ function App(){
                 <span style={{fontSize:11,color:"#8b949e"}}>/mo</span>
               </div>
             </div>
-            <button type="button" onClick={()=>set("view")("consumer")} disabled={!hasCustom} style={{padding:"14px 26px",borderRadius:8,fontSize:15,fontWeight:600,letterSpacing:"0.01em",cursor:hasCustom?"pointer":"not-allowed",border:"1px solid "+(hasCustom?tb:"#30363d"),background:hasCustom?tb:"transparent",color:hasCustom?"#0d1117":"#6e7681",fontFamily:"inherit",transition:"background 0.15s, box-shadow 0.15s",boxShadow:hasCustom?"0 1px 10px rgba(88,166,255,0.28)":"none",whiteSpace:"nowrap",flexShrink:0}} onMouseEnter={e=>{if(hasCustom)e.currentTarget.style.background="#79b8ff"}} onMouseLeave={e=>{if(hasCustom)e.currentTarget.style.background=tb}}>Open summary →</button>
           </div>
           </>)}
         </div>
@@ -1882,21 +1881,25 @@ function App(){
         </div>
         </div>
 
-        {(hasCustom||isSTR)&&(<>
-        {/* HOW THE NUMBERS WORK — reference notes, collapsed by default */}
-        <div style={{marginTop:16,...card}}>
-          <button type="button" aria-expanded={showHow} onClick={()=>setShowHow(v=>!v)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 22px",cursor:"pointer",width:"100%",background:"transparent",border:"none",borderRadius:10,fontFamily:"inherit"}}>
-            <span style={{fontSize:11,color:"#8b949e",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:500}}>How the numbers work</span>
-            <span style={{fontSize:13,color:"#8b949e"}}>{showHow?"▴":"▾"}</span>
-          </button>
-          {showHow&&(<div style={{padding:"0 22px 18px",fontSize:11.5,lineHeight:1.7,color:"#8b949e",display:"flex",flexDirection:"column",gap:10,maxWidth:820}}>
-            <div><strong style={{color:"#e6edf3"}}>Reading the results.</strong> Coverage and After loan payment are first-month, pre-tax figures. Cash-flow positive, Payback and Return include rent growth{incomeTax>0?" and income tax at "+incomeTax+"%":""}. Equity is the value multiplier ({grm}× long-term rent) — a heuristic; appraisals use comparable sales.</div>
-            <div><strong style={{color:"#e6edf3"}}>What's in the cost.</strong> Structure $/sq ft covers the shell, finishes, systems and built-in appliances; foundation, site work and furnishing are separate lines. The builder margin ({markup}%, {fD(markupAmt)}) is included. Not included: solar panels (required on new California homes, about $5–10K), landscaping restoration, or HOA fees.</div>
-            <div><strong style={{color:"#e6edf3"}}>How rental income is taxed.</strong> It goes on Schedule E — no LLC needed. You deduct expenses, loan interest and depreciation. Early on, deductions usually exceed income, so no tax is owed; as interest shrinks, taxable income grows. The passive-loss rules limit using those early losses against other income (the $25K allowance phases out between $100K and $150K of income), but they carry forward — set under Taxes & insurance. The income tax rate applies to Cash-flow positive, Payback and Return; leave it at 0% for a pre-tax view.</div>
-            <div style={{color:tb}}>Settings are saved automatically in this browser.</div>
-          </div>)}
-        </div>
+        {/* LAST STEP — once costs, financing and rent are set, hand off to the homeowner Summary */}
+        {(()=>{const ready=hasCustom||isSTR;
+          const goRent=()=>{const el=document.getElementById("rentAmt");if(el){el.scrollIntoView?.({block:"center",behavior:"smooth"});el.focus()}};
+          const item=(k,v)=>(<span style={{whiteSpace:"nowrap"}}><span style={{color:"#6e7681"}}>{k} </span><span style={{color:"#e6edf3",fontWeight:600}}>{v}</span></span>);
+          return(<div className="no-print last-step" style={{...card,marginTop:16,padding:"18px 22px",border:"1px solid "+(ready?tb+"80":"#30363d"),display:"flex",alignItems:"center",justifyContent:"space-between",gap:"14px 24px",flexWrap:"wrap"}}>
+          <div style={{flex:"1 1 320px",minWidth:0}}>
+            <div style={{fontSize:11,color:tb,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:4}}>Last step</div>
+            <h2 style={{margin:"0 0 8px",fontFamily:"'Fraunces',serif",fontSize:20,fontWeight:700,color:"#e6edf3",letterSpacing:"-0.01em"}}>Show the homeowner the Summary</h2>
+            <div style={{fontSize:12.5,lineHeight:1.7,display:"flex",flexWrap:"wrap",columnGap:16}}>
+              {item("Cost",fD(total))}
+              {item("Financing",isCash?"All cash":fD(loanAmt)+" at "+rate+"%, "+term+" yr")}
+              {item("Rent",isSTR?"$"+strADR+"/night":hasCustom?fD(customRent)+"/mo":"not set")}
+            </div>
+            <div style={{fontSize:11,color:ready?"#6e7681":yl,marginTop:6,lineHeight:1.5}}>{ready?"Check the costs and financing above, then open the Summary to share or print. Your inputs are saved in this browser.":"Enter the monthly rent to finish — the Summary needs it."}</div>
+          </div>
+          <button type="button" onClick={ready?()=>set("view")("consumer"):goRent} style={{padding:"14px 28px",borderRadius:8,fontSize:15,fontWeight:600,letterSpacing:"0.01em",cursor:"pointer",border:"1px solid "+(ready?tb:yl+"80"),background:ready?tb:"transparent",color:ready?"#0d1117":yl,fontFamily:"inherit",boxShadow:ready?"0 1px 10px rgba(88,166,255,0.28)":"none",whiteSpace:"nowrap"}}>{ready?"Open Summary →":"Enter the rent ↑"}</button>
+        </div>);})()}
 
+        {(hasCustom||isSTR)&&(<>
         {/* SOURCES */}
         <div style={{marginTop:24,...card}}>
           <button type="button" aria-expanded={showSources} onClick={()=>setShowSources(s=>!s)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 22px",cursor:"pointer",userSelect:"none",width:"100%",background:"transparent",border:"none",borderRadius:10,fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.03)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>

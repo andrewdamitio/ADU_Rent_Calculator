@@ -418,10 +418,27 @@ describe("streamlined layout", () => {
     const t = p.text();
     assert.match(t, /Contingency & builder margin.*Budget confidence.*Build time.*Where the money goes.*All-in build cost/);
     assert.match(t, /Monthly payment: \$[\d,]+\/moTotal repaid/);
-    assert.match(t, /How the numbers work/);
-    assert.doesNotMatch(t, /How rental income is taxed/);
-    await p.click("How the numbers work");
-    assert.match(p.text(), /How rental income is taxed/);
+    assert.doesNotMatch(t, /How the numbers work/, "the duplicate notes panel is gone");
+  });
+  test("opening the Summary is a Last step card after the inputs and results, not part of the rent card", async () => {
+    const p = await load("?customRent=2600");
+    const t = p.text();
+    assert.match(t, /Value & selling.*What would you charge for rent\?.*Last stepShow the homeowner the Summary.*Cost\s*\$[\d,]+.*Financing.*Rent\s*\$2,600\/mo.*Open Summary →.*Sources & data provenance/);
+    const rentCard = p.doc.querySelector("#rentAmt").closest("div[style*='padding: 16px 18px']");
+    assert.ok(![...rentCard.querySelectorAll("button")].some(b => /Summary/.test(b.textContent)), "no summary button beside the rent");
+    await p.click("Open Summary →");
+    assert.match(p.text(), /Your ADU Investment Summary/);
+  });
+  test("without a rent, the Last step sends you to the rent box instead", async () => {
+    const p = await load("");
+    assert.match(p.text(), /Last step.*Rent\s*not set.*Enter the monthly rent to finish.*Enter the rent ↑/);
+    await p.click("Enter the rent ↑");
+    assert.equal(p.doc.activeElement.id, "rentAmt");
+    assert.doesNotMatch(p.text(), /Your ADU Investment Summary/);
+  });
+  test("STR projects can open the Summary without a long-term rent", async () => {
+    const p = await load("?rentalMode=str&strADR=200");
+    assert.match(p.text(), /Rent\s*\$200\/night.*Open Summary →/);
   });
 });
 
