@@ -605,19 +605,27 @@ describe("what if you sold", () => {
     };
   };
   test("the ledger adds up", async () => {
-    const l = ledger((await load("?customRent=2600&cashDown=20&incomeTax=32&saleYear=8&view=consumer")).text());
+    const l = ledger((await load("?customRent=2600&saleOn=1&cashDown=20&incomeTax=32&saleYear=8&view=consumer")).text());
     assert.ok(l.bal < 0 && l.recapture < 0 && l.costs < 0, JSON.stringify(l));
     assert.ok(Math.abs(l.value + l.costs + l.bal + l.recapture + l.nol - l.proceeds) <= 3, JSON.stringify(l));
   });
   test("selling at loan payoff with no costs or tax equals the full picture's total return", async () => {
-    const t = (await load("?customRent=2600&cashDown=20&saleYear=10&sellCost=0&view=consumer")).text();
+    const t = (await load("?customRent=2600&saleOn=1&cashDown=20&saleYear=10&sellCost=0&view=consumer")).text();
     const picture = t.match(/Total return[^+−]*([+−]\$[\d.]+k)✓/)[1];
     assert.equal(ledger(t).net, picture);
   });
   test("recapture only with income tax; selling costs and sale year are set in Value & selling", async () => {
-    assert.doesNotMatch((await load("?customRent=2600&saleYear=8&view=consumer")).text(), /Depreciation recapture tax/);
-    const f = (await load("?customRent=2600&sellCost=4")).text();
+    assert.doesNotMatch((await load("?customRent=2600&saleOn=1&saleYear=8&view=consumer")).text(), /Depreciation recapture tax/);
+    const f = (await load("?customRent=2600&saleOn=1&sellCost=4")).text();
     assert.match(f, /Value & selling.*Selling costs.*4% of sale.*Sell after.*10 years of renting.*If sold then: about \$[\d,]+ from the sale/);
+  });
+  test("is off by default and can be switched on", async () => {
+    const p = await load("?customRent=2600");
+    assert.match(p.text(), /Include a sale scenarioOff/);
+    assert.doesNotMatch(p.report().textContent, /If sold after/);
+    await p.click("Include a sale scenario");
+    assert.match(p.text(), /Sell after/);
+    assert.doesNotMatch((await load("?customRent=2600&view=consumer")).text(), /What if you sold\?/);
   });
   test("can be turned off: no card, no selling settings, no report note", async () => {
     const c = await load("?customRent=2600&saleOn=0&view=consumer");
@@ -629,18 +637,18 @@ describe("what if you sold", () => {
     assert.match(f, /Value multiplier/, "the ADU's value still counts");
   });
   test("a homeowner can hide the card from the Summary", async () => {
-    const p = await load("?customRent=2600&view=consumer");
+    const p = await load("?customRent=2600&saleOn=1&view=consumer");
     await p.click("Not planning to sell? Hide this");
     assert.doesNotMatch(p.text(), /What if you sold\?/);
     assert.equal(p.saved().saleOn, false);
   });
   test("a loan paid off by the sale year shows no payoff line", async () => {
-    const t = (await load("?customRent=2600&cashDown=20&saleYear=10&view=consumer")).text();
+    const t = (await load("?customRent=2600&saleOn=1&cashDown=20&saleYear=10&view=consumer")).text();
     assert.doesNotMatch(t, /Pay off the remaining loan/);
     assert.match(t, /with the loan paid off/);
   });
   test("the report includes the sale scenario", async () => {
-    assert.match((await load("?customRent=2600&saleYear=12")).report().textContent, /If sold after 12 years of renting: .* leaves \$[\d,]+ — a net gain of/);
+    assert.match((await load("?customRent=2600&saleOn=1&saleYear=12")).report().textContent, /If sold after 12 years of renting: .* leaves \$[\d,]+ — a net gain of/);
   });
 });
 
@@ -925,7 +933,7 @@ describe("printed report", () => {
     for (const svg of svgs) { assert.ok(svg.getAttribute("viewBox")); assert.equal(svg.style.width, "100%"); }
   });
   test("method notes come first and 'Not included' last", async () => {
-    const r = (await load("?customRent=2600&firmOn=1&siteMode=facts")).report();
+    const r = (await load("?customRent=2600&saleOn=1&firmOn=1&siteMode=facts")).report();
     const items = [...r.querySelectorAll("li")].map(li => li.textContent);
     assert.match(items[0], /^Rent is the figure entered/);
     assert.match(items.at(-1), /^Not included/);

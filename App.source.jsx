@@ -182,7 +182,7 @@ const PTYPES={
 const DEF={projectType:"detached",...PTYPES.detached.v,siteMode:"dollars",...PTYPES.detached.f,rentalMode:"ltr",strADR:125,strGrowth:2,strCosts:20,strVacancy:15,strMonths:4,furnishing:0,cashDown:0,origFeeOn:false,origFee:5,rate:7.5,term:10,conIntMode:"paid",conPremium:0,horizon:10,taxRate:1.1,taxGrowth:2,insurance:0.5,insGrowth:5,maint:8,vacancy:5,mgmt:0,growth:3,grm:110,clientName:"",clientAddr:"",prepName:"",prepCompany:"",reportNotes:"",cmpOn:false,
   cmpBOn:true,cmpBName:"Home equity loan, 15 yr",cmpBRate:8,cmpBTerm:15,cmpBDown:0,cmpBFee:2,
   cmpCOn:true,cmpCName:"HELOC, 20 yr",cmpCRate:8.5,cmpCTerm:20,cmpCDown:0,cmpCFee:0,
-  cmpDOn:true,cmpDName:"All cash",cmpDRate:0,cmpDTerm:10,cmpDDown:100,cmpDFee:0,hookupCity:"ca",saleOn:true,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
+  cmpDOn:true,cmpDName:"All cash",cmpDRate:0,cmpDTerm:10,cmpDDown:100,cmpDFee:0,hookupCity:"ca",saleOn:false,saleYear:10,sellCost:6,incomeTax:0,lossCarry:true,firmOn:false,firm:"eeeeeeeeeee",customRent:0,customName:"",view:"internal"};
 const SK="adu-calc-v16";
 // Fields that make up a shareable scenario link — everything except UI-only state.
 const SHARE_KEYS=Object.keys(DEF).filter(k=>k!=="view");
