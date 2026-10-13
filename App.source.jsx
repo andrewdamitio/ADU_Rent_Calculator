@@ -928,7 +928,7 @@ const fieldValue={fontFamily:"'Fraunces',serif",fontSize:17,fontWeight:600,color
 const fieldNote={fontSize:11.5,color:LT.muted,marginTop:8,lineHeight:1.5};
 
 function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedBy,cmpCols,verdict,saleOn,setSaleOn,saleYear,setSaleYear,rentY1,unitNoun,grm,assetCost,origFeeAmt,origFee,costSteps,ptypeKey,total,loanPmt,loanAmt,cashDownAmt,rate,term,setTerm,horizon,setHorizon,growth,buildMonths,sqft,utype,isSTR,hasCustom,customName,cashDown,setCashDown,incomeTax,customRent,setCustomRent,setCustomName,sizeAnchor,rentLo,rentHi,copied,copyShare}){
-  const[barYear,setBarYear]=useState(1);const[showParts,setShowParts]=useState(false);
+  const[barYear,setBarYear]=useState(1);const[showParts,setShowParts]=useState(true);
   const[showMethod,setShowMethod]=useState(false);
   const fK2=n=>{const a=Math.abs(n),s=n<0?"−":"";return a>=1000000?s+"$"+(a/1000000).toFixed(1)+"M":a>=1000?s+"$"+Math.round(a/1000)+"k":s+"$"+Math.round(a)};
 
@@ -1206,7 +1206,7 @@ function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedB
       <div style={{...secH,marginBottom:4}}>Net equity position over time</div>
       <div style={{fontSize:12.5,color:LT.body,marginBottom:14,lineHeight:1.5}}>Total wealth created by the ADU at any point — asset value <strong style={{color:LT.info}}>minus</strong> remaining loan balance <strong style={{color:LT.info}}>plus</strong> your cash position. After the loan is paid off, the payment becomes income and growth accelerates.{buildMonths>0?" During the "+buildMonths+"-month build (shaded) the ADU's value stays at $0 — a half-built ADU can't be rented or appraised the normal way — so net equity dips while money goes out, then jumps when it's finished.":""}</div>
       <TimeChart pts={cm.pts} height={250} band={buildMonths>0?{to:buildMonths/12,label:"Building — not valued yet"}:null} ariaLabel="Net equity, ADU value, loan balance and cash position by year"
-        series={[{key:"tot",color:"#2563eb",width:3},...(showParts?[{key:"value",color:"#d97706",dash:"2,4",opacity:0.6},{key:"loanNeg",color:"#ef4444",dash:"4,3",opacity:0.5},{key:"cash",color:"#16a34a",dash:"4,3",opacity:0.55}]:[])]}
+        series={[{key:"tot",color:"#2563eb",width:3},...(showParts?[{key:"value",color:"#d97706",dash:"2,4",width:2,opacity:0.9},{key:"loanNeg",color:"#ef4444",dash:"5,3",width:2,opacity:0.85},{key:"cash",color:"#16a34a",dash:"5,3",width:2,opacity:0.85}]:[])]}
         area={{pos:"#2563eb",neg:"#2563eb"}}
         vlines={loanAmt>0?[{x:cm.loanEndYr,label:"Loan paid off"}]:[]}
         tooltip={p=>{const row=(l,v,c)=>(<div style={{display:"flex",justifyContent:"space-between",gap:12,marginBottom:2}}><span style={{color:"#94a3b8",fontSize:12}}>{l}</span><span style={{fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:600,color:c}}>{v}</span></div>);return(<>
@@ -1224,7 +1224,7 @@ function ConsumerView({cm,origFeeOn,setOrigFeeOn,costRange,preparedFor,preparedB
         {showParts&&<><span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dotted #d97706",verticalAlign:"middle",marginRight:5}}/>ADU value</span>
         <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dashed #ef4444",verticalAlign:"middle",marginRight:5}}/>Loan balance</span>
         <span><span style={{display:"inline-block",width:20,height:0,borderTop:"2px dashed #16a34a",verticalAlign:"middle",marginRight:5}}/>Cash position</span></>}
-        <button type="button" className="no-print" onClick={()=>setShowParts(v=>!v)} style={{marginLeft:"auto",background:"none",border:"none",padding:0,color:LT.info,fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}}>{showParts?"Hide the parts":"Show what makes it up"}</button>
+        <button type="button" className="no-print" onClick={()=>setShowParts(v=>!v)} aria-pressed={showParts} style={{marginLeft:"auto",background:showParts?"transparent":LT.infoBg,border:"1px solid "+LT.info,borderRadius:999,padding:"4px 12px",color:LT.info,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{showParts?"Hide the parts":"Show what makes it up"}</button>
       </div>
     </div>
 

@@ -402,12 +402,15 @@ describe("design polish", () => {
 });
 
 describe("streamlined layout", () => {
-  test("Summary: no duplicate post-loan card, no empty tax bar, net equity starts as one line", async () => {
+  test("Summary: no duplicate post-loan card, no empty tax bar, net equity shows its parts (and can hide them)", async () => {
     const p = await load("?customRent=2600&cashDown=20&view=consumer");
     const t = p.text();
     assert.doesNotMatch(t, /Life after the loan/);
     assert.doesNotMatch(t, /Income tax \(not modeled/);
     const chart = () => p.doc.querySelectorAll(".screen-only svg[role=img]")[1].querySelectorAll("path[fill=none]").length;
+    assert.equal(chart(), 4, "value, loan and cash lines show by default");
+    assert.match(p.text(), /Net equityADU valueLoan balanceCash positionHide the parts/);
+    await p.click("Hide the parts");
     assert.equal(chart(), 1);
     await p.click("Show what makes it up");
     assert.equal(chart(), 4);
